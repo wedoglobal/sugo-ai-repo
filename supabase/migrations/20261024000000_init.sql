@@ -1,5 +1,3 @@
-create extension if not exists pgcrypto;
-
 create table public.hosts (
   id uuid primary key default gen_random_uuid(),
   sugo_id text not null unique,

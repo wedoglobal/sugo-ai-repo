@@ -6,7 +6,9 @@
     "dev": "pnpm --filter @sugo/dashboard dev",
     "test": "vitest run",
     "db:start": "supabase start",
-    "db:reset": "supabase db reset"
+    "db:reset": "supabase db reset",
+    "db:link": "supabase link",
+    "db:push": "supabase db push"
   },
   "devDependencies": {
     "vitest": "^3.2.4"
