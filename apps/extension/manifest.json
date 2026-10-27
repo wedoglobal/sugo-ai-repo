@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Sugo Host",
+  "version": "0.1.0",
+  "description": "sugo.live mesajlarını Sugo Host dashboard'una bağlar.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://sugo.live/*",
+        "https://www.sugo.live/*"
+      ],
+      "js": [
+        "inject.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://sugo.live/*",
+        "https://www.sugo.live/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Sugo Host"
+  }
+}

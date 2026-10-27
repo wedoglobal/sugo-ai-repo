@@ -8,9 +8,24 @@ const persona = readPersona({
 
 describe('readPersona', () => {
   it('geçersiz değerleri varsayılana çeker', () => {
-    expect(persona.formality).toBe('casual');
+    expect(persona.formality).toBe(1);
     expect(persona.length).toBe('tiny');
     expect(persona.facts).toHaveLength(3);
+  });
+});
+
+describe('readPersona düzeyleri', () => {
+  it('eski metin değerlerini 0-3 düzeye çevirir, geçersiz saat dilimini varsayılana çeker', () => {
+    const p = readPersona({ formality: 'very_casual', emoji: 'often', typos: true, laughter: 9, timeZone: 'Mars/Olympus' });
+    expect(p).toMatchObject({ formality: 0, emoji: 3, typos: 1, laughter: 1, timeZone: 'Europe/Istanbul', laughCooldown: 2, laughMax: 0 });
+    expect(readPersona({ typos: false, timeZone: 'Europe/Berlin' })).toMatchObject({ typos: 0, timeZone: 'Europe/Berlin' });
+  });
+});
+
+describe('readPersona ses', () => {
+  it('yalnız sunulan kadın seslerini kabul eder', () => {
+    expect(readPersona({ voice: 'Kore' }).voice).toBe('Kore');
+    expect(readPersona({ voice: 'Puck' }).voice).toBe('');
   });
 });
 
@@ -48,5 +63,15 @@ describe('buildReplyMessages', () => {
     expect(user).toMatch(/job: doktor/);
     expect(user).toMatch(/Sen: selam/);
     expect(user).toMatch(/- nasılsın/);
+  });
+});
+
+describe('genel kurallar', () => {
+  it('ortak kuralları sistem mesajına ekler, boşsa eklemez', () => {
+    const base = { kind: 'reply', persona: readPersona({}), unread: ['selam'] };
+    const withRules = buildReplyMessages({ ...base, rules: ['önce teşekkür et, sonra öv'] })[0].content;
+    expect(withRules).toContain('Genel kurallar');
+    expect(withRules).toContain('önce teşekkür et, sonra öv');
+    expect(buildReplyMessages(base)[0].content).not.toContain('Genel kurallar');
   });
 });

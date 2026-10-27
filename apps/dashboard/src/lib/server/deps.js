@@ -1,4 +1,4 @@
-import { createLlm } from '@sugo/core';
+import { createLlm, createSpeech } from '@sugo/core';
 import { createClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/private';
 
@@ -11,9 +11,11 @@ export function db() {
 export function deps() {
   return {
     llm: createLlm({ apiKey: env.OPENROUTER_API_KEY }),
+    speech: createSpeech({ apiKey: env.OPENROUTER_API_KEY }),
     models: {
       chat: env.SUGO_MODEL_CHAT || 'x-ai/grok-4.7',
       extract: env.SUGO_MODEL_EXTRACT || 'google/gemini-2.5-flash',
+      speech: env.SUGO_MODEL_SPEECH || 'google/gemini-3.8-flash-lite-tts',
     },
   };
 }

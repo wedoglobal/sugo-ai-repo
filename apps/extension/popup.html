@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  body { width: 280px; font: 13px system-ui; padding: 12px; }
+  label { display: block; margin-top: 8px; }
+  input[type=text], input[type=password] { width: 100%; box-sizing: border-box; padding: 4px; }
+  button { margin-top: 12px; }
+</style>
+<label>Dashboard URL <input id="baseUrl" type="text"></label>
+<label>EXTENSION_API_KEY <input id="apiKey" type="password"></label>
+<label>Host sugo id <input id="hostSugoId" type="text"></label>
+<label><input id="enabled" type="checkbox"> Otomasyon açık</label>
+<button id="save">Kaydet</button> <span id="status"></span>
+<hr>
+<label>Ses testi metni <input id="voiceText" type="text" maxlength="300" value="selam, bu bir ses testi"></label>
+<button id="testVoice">Açık sohbete test sesi gönder</button>
+<div id="voiceStatus"></div>
+<script src="popup.js"></script>
