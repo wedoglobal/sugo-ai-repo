@@ -16,6 +16,7 @@ const SEL = {
   send: 'button[aria-label="Send message"]',
   userCard: '[data-testid=message-user-card]',
   gift: '[data-testid=private-gift-card]',
+  female: '.common-user-badge-list-item-gender-and-age--female',
 };
 
 async function waitFor(fn, timeout = 8000) {
@@ -156,7 +157,11 @@ async function typeAndSend(dialog, text) {
   const before = sentCount(dialog);
   const beforeFailed = failedCount(dialog);
   const sent = async () => !!(await waitFor(() => sentCount(dialog) > before || failedCount(dialog) > beforeFailed, 4000));
-  const outcome = () => failedCount(dialog) > beforeFailed ? false : true;
+  // Mesaj önce gönderildi görünüp sugo filtresi yüzünden birazdan kırmızı ünlemle işaretlenebilir: kısa bir süre sonra sohbet yeniden okunur.
+  const outcome = async () => {
+    await sleep(rand(1000, 1600));
+    return failedCount(dialog) <= beforeFailed;
+  };
 
   await fillInput(input, text);
   await sleep(rand(300, 800));
@@ -276,29 +281,50 @@ async function runJob(cfg, job) {
   }
 }
 
+/** Kadın profili olduğu için cevaplanmayan sohbetler; oturum boyunca bir daha açılmaz. */
+const skipped = new Set();
 /**
  * Sıradaki sohbet: liste en yeni üstte olduğundan en eski okunmamış sohbet listedeki sonuncusudur.
  * Okunmamış yoksa sugo'nun eşleşme verdiği (önizlemede "eşleşme" geçen), henüz açılmamış sohbet. Önizlemede hâlâ "eşleşme" yazıyorsa ona hiçbir şey gitmemiştir; kısa aralıkla yeniden denenir.
  */
 const GREET_RETRY_MS = 3 * 60 * 1000;
 const greeted = new Map();
+/** Sohbet en son hangi satır görünümüyle (önizleme, saat) okundu. Site okunmadı işaretini kaldırmasa da aynı görünümdeki sohbet HANDLED_RETRY_MS boyunca yeniden açılmaz; süre dolunca okunmadı kaldıysa tekrar okunur, böylece cevapsız sohbet kalmaz. */
+const HANDLED_RETRY_MS = 60 * 1000;
+const handled = new Map();
+const rowSignature = (r) => r.innerText.replace(/\s+/g, ' ').trim();
 function nextRow() {
-  const unread = [...document.querySelectorAll(`${SEL.row}:has(${SEL.unread})`)].pop();
+  const unread = [...document.querySelectorAll(`${SEL.row}:has(${SEL.unread})`)].filter((r) => {
+    const id = r.getAttribute('data-message-conversation-id');
+    const h = handled.get(id);
+    return !skipped.has(id) && !(h && h.sig === rowSignature(r) && Date.now() - h.at < HANDLED_RETRY_MS);
+  }).pop();
   if (unread) return unread;
-  return [...document.querySelectorAll(SEL.row)].find((r) => Date.now() - (greeted.get(r.getAttribute('data-message-conversation-id')) ?? 0) > GREET_RETRY_MS && /eşleşme/i.test(r.innerText.toLocaleLowerCase('tr'))) ?? null;
+  return [...document.querySelectorAll(SEL.row)].find((r) => Date.now() - (greeted.get(r.getAttribute('data-message-conversation-id')) ?? 0) > GREET_RETRY_MS && !skipped.has(r.getAttribute('data-message-conversation-id')) && /eşleşme/i.test(r.innerText.toLocaleLowerCase('tr'))) ?? null;
 }
 
 async function ingestUnread(cfg) {
   const row = nextRow();
   if (!row) return;
-  greeted.set(row.getAttribute('data-message-conversation-id'), Date.now());
   const peerSugoId = row.getAttribute('data-message-conversation-id');
+  greeted.set(peerSugoId, Date.now());
+  handled.set(peerSugoId, { sig: rowSignature(row), at: Date.now() });
   const peerName = row.querySelector(SEL.name)?.innerText.trim() ?? '';
   const dialog = await openChat(row);
   if (!dialog) return;
+  if (dialog.querySelector(`${SEL.userCard} ${SEL.female}`)) {
+    skipped.add(peerSugoId);
+    console.info('[sugo-host] kadın profili, cevaplanmadı:', peerSugoId);
+    return leaveChat();
+  }
   const messages = parseMessages(dialog);
-  if (!messages.length && !dialog.querySelector(SEL.userCard)) return leaveChat();
-  await call({ path: '/api/ext/ingest', method: 'POST', body: { hostSugoId: cfg.hostSugoId, peerSugoId, peerName, voiceEnabled: voiceEnabled(), messages } });
+  if (!messages.length && !dialog.querySelector(SEL.userCard)) {
+    console.info('[sugo-host] sohbette okunacak mesaj yok:', peerSugoId);
+    return leaveChat();
+  }
+  const res = await call({ path: '/api/ext/ingest', method: 'POST', body: { hostSugoId: cfg.hostSugoId, peerSugoId, peerName, voiceEnabled: voiceEnabled(), messages } });
+  if (!res?.ok) handled.delete(peerSugoId);
+  console.info('[sugo-host] sohbet okundu, sunucuya gönderildi:', peerSugoId, `${messages.length} mesaj`);
   await leaveChat();
 }
 
