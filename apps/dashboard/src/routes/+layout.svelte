@@ -6,6 +6,7 @@
 {#if data.authed}
   <nav>
     <strong>Sugo Host</strong>
+    <a href="/">Ana sayfa</a>
     <a href="/hosts">Hostlar</a>
     <a href="/pairs">Pair'ler</a>
     <a href="/queue">Kuyruk</a>

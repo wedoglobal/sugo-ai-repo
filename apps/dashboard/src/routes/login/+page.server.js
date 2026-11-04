@@ -7,7 +7,7 @@ export const actions = {
     const password = (await request.formData()).get('password');
     if (!checkPassword(password)) return fail(401, { error: 'Şifre yanlış' });
     cookies.set(COOKIE, makeSession(), { path: '/', httpOnly: true, secure: !dev, sameSite: 'lax', maxAge: sessionMaxAge });
-    redirect(303, '/hosts');
+    redirect(303, '/');
   },
   logout: async ({ cookies }) => {
     cookies.delete(COOKIE, { path: '/' });

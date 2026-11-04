@@ -1,9 +1,12 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { db, must } from '$lib/server/deps.js';
+import { earningsByHost, emptyEarnings } from '$lib/server/earnings.js';
 
-export const load = async () => ({
-  hosts: must(await db().from('hosts').select('id, sugo_id, name, active').order('created_at')),
-});
+export const load = async () => {
+  const hosts = must(await db().from('hosts').select('id, sugo_id, name, active').order('created_at'));
+  const byHost = await earningsByHost();
+  return { hosts: hosts.map((h) => ({ ...h, earn: byHost.get(h.id) ?? emptyEarnings })) };
+};
 
 export const actions = {
   create: async ({ request }) => {
