@@ -147,8 +147,49 @@ export function removeRepeatedWords(text, said, heard = [], window = 3) {
   return (out.match(WORD) ?? []).length >= 2 ? out : text;
 }
 
+const FUNCTION_WORDS = new Set(['evet', 'hayır', 'tamam', 'olur', 'peki', 'için', 'gibi', 'ile', 'çok', 'daha', 'sen', 'ben', 'biz', 'siz', 'onu', 'bunu', 'şunu', 'neden', 'nasıl', 'ne', 'var', 'yok', 'değil', 'bile', 'ama', 'fakat', 'çünkü', 'yani', 'şey', 'iyi', 'güzel', 'bugün', 'yarın']);
+/** Harf uzatmalarını tek harfe indirir, Türkçe harfleri sadeleştirir ("asskkkkm", "askm" ve "aşkım" aynı sözcük sayılır). */
+const squash = (w) => lower(w).split(/['’]/u)[0].replace(/ı/g, 'i').normalize('NFD').replace(/\p{M}/gu, '').replace(/(\p{L})\1+/gu, '$1');
+/** Ünlüsüz iskelet: "asskkkkm" ve "aşkım" aynı anahtarı verir. */
+const frequentKey = (w) => squash(w).replace(/[aeiouöü]/g, '').slice(0, 5);
+
 /**
- * Dört ayıklamayı sırayla uygular. `history` pair'in önceki mesajlarıdır (direction 'out' = hostun kendi cevabı).
+ * Sürekli tekrar eden sözcükleri otomatik bulur: hostun cevaplarında 3 kez kullanılan (harf uzatmaları dahil) bir sözcük,
+ * sonraki `ban` cevapta kullanılamaz; bu cevapta geçerse silinir, sonra sayaç sıfırlanır.
+ * Karşı tarafın kullandığı sözcüklere, alıntılara, bağlantılara dokunulmaz; geriye iki sözcükten azı kalacaksa metin değişmez.
+ * @param {string} text @param {string[]} said hostun kendi satırları, en yeni sonda @param {string[]} heard karşı tarafın son mesajları
+ */
+export function removeFrequentWords(text, said, heard = [], { uses = 3, ban = 6 } = {}) {
+  const keysOf = (line) => new Set([...String(line ?? '').matchAll(WORD)].map((m) => squash(m[0])).filter((w) => w.length >= 3 && !FUNCTION_WORDS.has(w)).map(frequentKey).filter((k) => k.length >= 3));
+  const state = new Map();
+  for (const line of said) {
+    const used = keysOf(line);
+    for (const [key, st] of state) {
+      if (st.ban > 0) st.ban--;
+      else if (!used.has(key) && ++st.idle >= ban) state.delete(key);
+    }
+    for (const key of used) {
+      const st = state.get(key) ?? { count: 0, ban: 0, idle: 0 };
+      state.set(key, st);
+      if (st.ban > 0) continue;
+      st.idle = 0;
+      if (++st.count >= uses) { st.count = 0; st.ban = ban; }
+    }
+  }
+  const banned = new Set([...state].filter(([, st]) => st.ban > 0).map(([key]) => key));
+  if (!banned.size) return text;
+  const theirs = new Set(heard.flatMap((line) => [...String(line ?? '').matchAll(WORD)].map((m) => frequentKey(m[0]))));
+  const protectedRanges = [...text.matchAll(/https?:\/\/\S+|www\.\S+|@[\p{L}\p{N}_]+|"[^"\n]*"|“[^”\n]*”|`[^`\n]*`/gu)].map((m) => [m.index, m.index + m[0].length]);
+  const remove = [...text.matchAll(WORD)]
+    .filter((m) => banned.has(frequentKey(m[0])) && !theirs.has(frequentKey(m[0])) && !protectedRanges.some(([a, b]) => m.index < b && m.index + m[0].length > a))
+    .map((m) => ({ start: m.index, end: m.index + m[0].length }));
+  if (!remove.length) return text;
+  const out = removeRanges(text, remove);
+  return (out.match(WORD) ?? []).length >= 2 ? out : text;
+}
+
+/**
+ * Ayıklamaları sırayla uygular. `history` pair'in önceki mesajlarıdır (direction 'out' = hostun kendi cevabı).
  * @param {string} text @param {{address?:string, laughs?:string[], laughCooldown?:number, laughMax?:number}} persona
  * @param {{direction:string, text:string}[]} history
  * @param {string[]} heard cevaplanan yeni mesajlar; karşı tarafın kullandığı sözcükler tekrar sayılmaz
@@ -158,5 +199,5 @@ export function removeRepetition(text, persona, history, heard = []) {
   const withoutAddress = removeRepeatedAddress(text, persona.address, said);
   const withoutLaughs = removeRepeatedLaughter(withoutAddress, persona.laughs, said, { cooldown: persona.laughCooldown ?? 2, maxIn20: persona.laughMax ?? 0 });
   const peer = [...history.filter((m) => m.direction === 'in').slice(-3).map((m) => m.text), ...heard];
-  return removeRepeatedEnding(removeRepeatedWords(withoutLaughs, said, peer), said);
+  return removeRepeatedEnding(removeRepeatedWords(removeFrequentWords(withoutLaughs, said, peer), said, peer), said);
 }

@@ -1,11 +1,14 @@
 <script>
+  import ProfileControl from '$lib/ProfileControl.svelte';
   import HostEditor from '$lib/HostEditor.svelte';
 
   let { data, form } = $props();
   const h = $derived(data.host);
 </script>
 
-<h1>{h.name || 'Host'} <span class="muted">/profile/{h.sugo_id}</span></h1>
+<div class="page-heading"><div><div class="eyebrow-label">AI PROFILE / #{h.sugo_id}</div><h1>{h.name || 'AI profili'}</h1><p>Karakter, ses ve hafıza ayarlarını bu profilden yönet.</p></div><a class="primary-link" href="/hosts/{h.id}/network">◎ Konum ve bağlantı ↗</a></div>
+
+<div class="card"><ProfileControl host={h} /></div>
 <form method="POST" action="?/import" enctype="multipart/form-data" class="card"
   onsubmit={(e) => { if (!confirm('Mevcut persona, bilgiler ve bilgi bankası dosyadakiyle değiştirilsin mi?')) e.preventDefault(); }}>
   <label for="file">Persona JSON içe aktar (persona, bilgiler, örnekler ve bilgi bankasını doldurur)</label>

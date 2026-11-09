@@ -1,14 +1,19 @@
 {
   "manifest_version": 3,
-  "name": "Sugo Host",
-  "version": "0.1.0",
-  "description": "sugo.live mesajlarını Sugo Host dashboard'una bağlar.",
+  "name": "Velora AI",
+  "version": "0.2.1",
+  "description": "Velora AI: sohbet otomasyonu, site bazlı GPS ve IPv4 proxy yönetimi.",
   "permissions": [
-    "storage"
+    "storage",
+    "debugger",
+    "proxy",
+    "tabs",
+    "webRequest",
+    "webRequestAuthProvider",
+    "contentSettings"
   ],
   "host_permissions": [
-    "http://localhost/*",
-    "http://127.0.0.1/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js",
@@ -35,10 +40,32 @@
         "content.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://sugo-host.b-erdincozer.workers.dev/*"
+      ],
+      "js": [
+        "network-bridge.js"
+      ],
+      "run_at": "document_start"
     }
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Sugo Host"
+    "default_title": "Velora AI",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "minimum_chrome_version": "108",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
 }

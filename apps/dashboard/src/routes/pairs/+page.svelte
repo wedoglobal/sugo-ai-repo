@@ -2,9 +2,9 @@
   let { data } = $props();
 </script>
 
-<h1>Pair'ler</h1>
+<h1>Sohbetler</h1>
 <table>
-  <thead><tr><th>Pair</th><th>Host</th><th>Karşı taraf</th><th>Okunmamış</th><th>Son aktivite</th></tr></thead>
+  <thead><tr><th>Sohbet</th><th>Host</th><th>Karşı taraf</th><th>Okunmamış</th><th>Son aktivite</th></tr></thead>
   <tbody>
     {#each data.pairs as p (p.id)}
       <tr>
@@ -13,7 +13,7 @@
         <td>{data.counts[p.id] ?? 0}</td><td>{new Date(p.last_activity_at).toLocaleString('tr-TR')}</td>
       </tr>
     {:else}
-      <tr><td colspan="5" class="muted">Pair yok.</td></tr>
+      <tr><td colspan="5" class="muted">Henüz sohbet yok.</td></tr>
     {/each}
   </tbody>
 </table>

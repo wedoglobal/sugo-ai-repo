@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 5190",
-    "build": "vite build",
-    "deploy": "vite build && wrangler deploy",
-    "preview": "vite build && wrangler dev"
+    "build": "node ../../scripts/package-extension.js && vite build",
+    "deploy": "node ../../scripts/check-production.js && pnpm build && wrangler deploy",
+    "preview": "pnpm build && wrangler dev"
   },
   "dependencies": {
     "@sugo/core": "workspace:*",

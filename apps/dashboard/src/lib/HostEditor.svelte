@@ -70,7 +70,7 @@
     <div class="row">
       <div><label for="timeZone">Saat dilimi</label><input id="timeZone" name="timeZone" value={p.timeZone} placeholder="Europe/Istanbul" maxlength="100" autocomplete="off" spellcheck="false" />
         <span class="muted">Haftalık rutin ve "şu an" bu saat dilimine göre okunur.</span></div>
-      <div><label><input type="checkbox" name="active" checked={h.active} /> Aktif</label></div>
+      <div class="muted" style="align-self:center">Çalışma durumunu üstteki Başlat / Durdur kontrollerinden yönet.</div>
     </div>
   </fieldset>
 
@@ -133,7 +133,8 @@
 
   <fieldset class="card">
     <legend>Ses</legend>
-    <p class="muted">Biri ses isteyince önce kataloğundaki gönderilmemiş bir ses dosyası gider; kalmadıysa cevap bu sesle okunur. Ses seçilmediyse ses gönderilmez.</p>
+    <p class="muted">Yakınlık seviyesi yeterliyse hazır ses klipleri normal cevapların yaklaşık %20’sine eklenir; cinsel taleplerde bu oran %70’tir. Aynı klip aynı kişiye tekrar gönderilmez. Ses istendiğinde önce kullanılmamış klip seçilir; kalmadıysa aşağıdaki sesle cevap okunur.</p>
+    <p class="muted">Açık arama isteklerinde bilgisayardan girildiği ve burada arama olmadığı söylenir; ses gönderilebiliyorsa sesli mesajla devam edilir.</p>
     <div class="row">
       <div><label for="voice">Ses</label>
         <select id="voice" name="voice" bind:value={voice}><option value="">Kapalı</option>{#each data.voices as v}<option value={v}>{v}</option>{/each}</select></div>
@@ -145,10 +146,8 @@
         <span class="muted">{testState}</span></div>
     </div>
     <div class="item">
-      <label class="inline"><input type="checkbox" name="nudge" checked={p.nudge} disabled={!voice} /> Cevapsız kalınca sesli dürt</label>
-      <p class="muted">Son mesajımıza <input class="mini" name="nudgeMinutes" type="number" min="1" max="60" value={p.nudgeMinutes} disabled={!voice} /> dakika cevap gelmezse, sesli mesajı açık (yakınlık seviyesi yeterli) ve bize en az bir kez yazmış kişiye kısa bir cümle sesli gider. Bir sessizlik için en fazla bir kez; kişi yazınca yeniden mümkün olur.</p>
-      <label for="nudgeLines">Dürtme cümleleri (satır başına bir tane; boşsa varsayılanlar)</label>
-      <textarea id="nudgeLines" name="nudgeLines" rows="4" maxlength="1000" disabled={!voice} placeholder={'niye bakmıyorsun\nbeni sevmedin mi\noff baksana'}>{p.nudgeLines.join('\n')}</textarea>
+      <label class="inline"><input type="checkbox" name="nudge" checked={p.nudge} /> Cevapsız kalınca fotoğrafla dürt</label>
+      <p class="muted">Son mesajımıza <input class="mini" name="nudgeMinutes" type="number" min="1" max="60" value={p.nudgeMinutes} /> dakika cevap gelmezse, bize daha önce yazmış kişiye kullanılmamış bir katalog fotoğrafı gönderilir. Kişi tekrar yazana kadar bir kez uygulanır.</p>
     </div>
     <p>{#each VOICE_PRESETS as [label, text]}<button type="button" class="ghost" disabled={!voice} onclick={() => { voiceStyle = text; touch(); }}>{label}</button> {/each}</p>
   </fieldset>

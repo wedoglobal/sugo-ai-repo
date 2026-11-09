@@ -8,9 +8,12 @@
     "db:start": "supabase start",
     "db:reset": "supabase db reset",
     "db:link": "supabase link",
-    "db:push": "supabase db push"
+    "db:push": "supabase db push",
+    "extension:package": "node scripts/package-extension.js"
   },
   "devDependencies": {
+    "esbuild": "0.28.2",
+    "javascript-obfuscator": "5.10.0",
     "vitest": "^3.2.4"
   }
 }

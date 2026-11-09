@@ -5,3 +5,10 @@ build
 supabase/.temp
 supabase/.branches
 .DS_Store
+.wrangler
+.dev.vars
+
+# Anahtar içeren yerel dağıtım paketleri ve sunucu modülü
+apps/dashboard/.extension-build/
+apps/dashboard/src/lib/server/generated/
+apps/dashboard/static/downloads/

@@ -3,7 +3,7 @@ import { db, must } from '$lib/server/deps.js';
 import { earningsByHost, emptyEarnings } from '$lib/server/earnings.js';
 
 export const load = async () => {
-  const hosts = must(await db().from('hosts').select('id, sugo_id, name, active').order('created_at'));
+  const hosts = must(await db().from('hosts').select('id, sugo_id, name, active, updated_at').order('created_at'));
   const byHost = await earningsByHost();
   return { hosts: hosts.map((h) => ({ ...h, earn: byHost.get(h.id) ?? emptyEarnings })) };
 };

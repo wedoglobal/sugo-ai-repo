@@ -3,7 +3,7 @@
 </script>
 
 <h1>Playground</h1>
-<p class="muted">Sugo'ya hiçbir şey gönderilmez. Aynı pipeline çalışır; kişi (<code>pg&lt;kod&gt;</code>) için hafıza birikir. Boş mesaj = karşılama mesajı.</p>
+<p class="muted">Platforma mesaj gönderilmez. Aynı pipeline çalışır; kişi (<code>pg&lt;kod&gt;</code>) için hafıza birikir. Boş mesaj = karşılama mesajı.</p>
 <form method="POST" action="?/send" class="card">
   <div class="row">
     <div><label for="host">Host</label>

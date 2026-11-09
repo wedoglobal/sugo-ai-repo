@@ -18,6 +18,13 @@ supabase login
 pnpm db:link --project-ref <ref>   # DB şifresi sorulur
 pnpm db:push                       # migration'lar cloud'a uygulanır (seed.sql cloud'a gitmez)
 ```
-Deploy ortamına şu env'ler verilir: `SUPABASE_URL` (https://<ref>.supabase.co), `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_PASSWORD`, `SESSION_SECRET` (uzun rastgele), `EXTENSION_API_KEY`, `ORIGIN` (public URL, https), `OPENROUTER_API_KEY`.
+## Cloudflare Workers
+`apps/dashboard/wrangler.jsonc` içindeki `SUPABASE_URL`'i `https://<ref>.supabase.co` yap, sonra:
+```bash
+cd apps/dashboard
+pnpm wrangler login
+for k in SUPABASE_SERVICE_ROLE_KEY ADMIN_PASSWORD SESSION_SECRET EXTENSION_API_KEY OPENROUTER_API_KEY; do pnpm wrangler secret put $k; done
+pnpm deploy                        # build + wrangler deploy
+```
+Yerel Workers önizlemesi: `apps/dashboard/.dev.vars` (gitignore'da) + `pnpm preview`. Opsiyonel model değişkenleri (`SUGO_MODEL_*`) `wrangler.jsonc` `vars` altına eklenir.
 İlk host'u dashboard'dan veya extension'ın `POST /api/ext/hosts/<id>/sync` çağrısıyla oluştur.
-`Dockerfile` ile imaj alınır (`docker build -t sugo-host .`, port 3000); HTTPS arkasında çalıştır (cookie `secure`).

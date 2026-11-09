@@ -56,7 +56,7 @@ export const actions = {
       extras: readPersona(current.persona).extras,
     });
     const { error: err } = await db().from('hosts').update({
-      name: text(f.get('name'), 100), active: f.get('active') === 'on',
+      name: text(f.get('name'), 100),
       model: text(f.get('model'), 200) || null, persona, knowledge, updated_at: new Date().toISOString(),
     }).eq('id', params.id);
     if (err) return fail(400, { error: err.message });

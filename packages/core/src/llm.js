@@ -3,17 +3,18 @@ const URL = 'https://openrouter.ai/api/v1/chat/completions';
 export class LlmError extends Error {}
 
 /**
- * OpenRouter chat istemcisi. `fetchImpl` testlerde enjekte edilir.
- * @returns {(req: {model:string, messages:object[], temperature?:number, json?:boolean, maxTokens?:number}) => Promise<string>}
+ * OpenRouter chat istemcisi. Pozitif `thinkTokens` düşünme bütçesini toplam sınıra ekler; 0 düşünmeyi kapatır. `fetchImpl` testlerde enjekte edilir.
+ * @returns {(req: {model:string, messages:object[], temperature?:number, json?:boolean, maxTokens?:number, thinkTokens?:number}) => Promise<string>}
  */
 export function createLlm({ apiKey, fetchImpl = fetch, timeoutMs = 45000 }) {
-  return async function chat({ model, messages, temperature = 0.8, json = false, maxTokens = 600 }) {
+  return async function chat({ model, messages, temperature = 0.8, json = false, maxTokens = 600, thinkTokens = 1000 }) {
     if (!apiKey) throw new LlmError('OPENROUTER_API_KEY tanımlı değil');
     const res = await fetchImpl(URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-Title': 'Sugo Host' },
       body: JSON.stringify({
-        model, messages, temperature, max_tokens: maxTokens,
+        model, messages, temperature, max_tokens: maxTokens + thinkTokens,
+        reasoning: thinkTokens === 0 ? { enabled: false } : { max_tokens: thinkTokens },
         ...(json ? { response_format: { type: 'json_object' } } : {}),
       }),
       signal: AbortSignal.timeout(timeoutMs),

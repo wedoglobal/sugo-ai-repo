@@ -24,6 +24,7 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
   const calls = [];
   const deps = {
     models: { chat: 'chat', extract: 'extract' },
+    random: () => 0.99,
     llm: async (req) => {
       calls.push(req);
       if (req.json) return JSON.stringify({ permanent: { name: { value: 'Ali', confidence: 0.95 }, residence: { value: 'Bursa', confidence: 0.9 } }, temp: ['yorgun'] });
@@ -32,12 +33,26 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
   };
   const peer = `t${Date.now()}`;
 
+  /** Ayarı geçici olarak değiştirir; dashboard'da girilmiş gerçek değeri bozmamak için eskisini geri yükleyen fonksiyon döner. */
+  async function overrideSetting(key, value) {
+    const { data: prev } = await db.from('app_settings').select('value').eq('key', key).maybeSingle();
+    await db.from('app_settings').upsert({ key, value });
+    return () => prev ? db.from('app_settings').upsert({ key, value: prev.value }) : db.from('app_settings').delete().eq('key', key);
+  }
+
+  const restores = [];
+
   beforeAll(async () => {
     db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+    // Dashboard'da girilmiş ortak ayarlar testleri etkilemesin; bitince aynen geri yüklenir.
+    for (const key of ['greetings', 'gift_thanks', 'persona_rules', 'replacements', 'knowledge']) restores.push(await overrideSetting(key, []));
     const { error } = await db.from('hosts').insert({ sugo_id: HOST, name: 'test' });
     if (error) throw new Error(error.message);
   });
-  afterAll(async () => { await db.from('hosts').delete().eq('sugo_id', HOST); });
+  afterAll(async () => {
+    await db.from('hosts').delete().eq('sugo_id', HOST);
+    for (const restore of restores.reverse()) await restore();
+  });
 
   it('boş sohbette welcome üretir, kuyruğa alır, extension tamamlar', async () => {
     const r = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: peer, peerName: 'Ali', messages: [] });
@@ -72,6 +87,29 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
     expect(again.job.id).toBe(r.job.id);
     const { data: msgs } = await db.from('messages').select('id').eq('pair_id', r.pairId);
     expect(msgs).toHaveLength(2); // gönderilen welcome snapshot'taki out ile eşleşti + in
+  });
+
+  it('hafıza çıkarma tamamlanınca güncel hafızayla tek cevap üretilir', async () => {
+    const run = async (extracted) => {
+      const seen = [];
+      const local = {
+        models: deps.models,
+        llm: async (req) => {
+          if (req.json) return JSON.stringify(extracted);
+          seen.push(JSON.stringify(req.messages));
+          return 'tamam';
+        },
+      };
+      const p = `par${Date.now()}${Math.floor(Math.random() * 1000)}`;
+      const r = await ingest(db, local, { hostSugoId: HOST, peerSugoId: p, messages: [{ dir: 'in', text: 'ben Veli', ts: '19:00' }] });
+      await db.from('pairs').delete().eq('id', r.pairId); // bekleyen job sonraki testlerin kuyruğunu bozmasın
+      return seen;
+    };
+    const fresh = await run({ permanent: { name: { value: 'Veli', confidence: 0.95 } }, temp: [] });
+    expect(fresh).toHaveLength(1);
+    expect(fresh[0]).toContain('name: Veli');
+    expect(fresh[0]).not.toContain('kalıcı bilgileri:\\n- (yok)');
+    expect(await run({ permanent: {}, temp: [] })).toHaveLength(1);
   });
 
   it('filtreye takılan mesaj için konuya uygun yedek cevap üretir ve onu tamamlar', async () => {
@@ -123,7 +161,7 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
   });
 
   it('hazır karşılama metinleri varsa selam onlardan biri olur, modele sorulmaz', async () => {
-    await db.from('app_settings').upsert({ key: 'greetings', value: ['hazır selam'] });
+    const restore = await overrideSetting('greetings', ['hazır selam']);
     try {
       const before = calls.length;
       const r = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: `g${Date.now()}`, messages: [] });
@@ -132,12 +170,12 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
       expect(calls.length).toBe(before);
       await completeJob(db, job.id);
     } finally {
-      await db.from('app_settings').delete().eq('key', 'greetings');
+      await restore();
     }
   });
 
   it('hediyeye hazır teşekkür gider: sesli mesaj açıksa sesle, kapalıysa yazıyla', async () => {
-    await db.from('app_settings').upsert({ key: 'gift_thanks', value: ['hediye için sağ ol'] });
+    const restore = await overrideSetting('gift_thanks', ['hediye için sağ ol']);
     const spoken = [];
     const withSpeech = { ...deps, models: { ...deps.models, speech: 'tts' }, speech: async (req) => { spoken.push(req); return new Uint8Array([1, 2, 3, 4]); } };
     try {
@@ -158,7 +196,7 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
       expect(tj).toMatchObject({ text: 'hediye için sağ ol', sendText: true });
       await completeJob(db, tj.id);
     } finally {
-      await db.from('app_settings').delete().eq('key', 'gift_thanks');
+      await restore();
     }
   });
 
@@ -166,7 +204,7 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
     const { data: h } = await db.from('hosts').select('id').eq('sugo_id', HOST).single();
     await db.from('media').insert({ host_id: h.id, path: `${HOST}/v.mp3`, name: 'v.mp3', content_type: 'audio/mpeg' });
     const p = `vo${Date.now()}`;
-    const r = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, messages: [{ dir: 'out', text: 'selam', ts: '1' }, { dir: 'in', text: 'sesini duyabilir miyim', ts: '2' }] });
+    const r = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, voiceEnabled: true, messages: [{ dir: 'out', text: 'selam', ts: '1' }, { dir: 'in', text: 'sesini duyabilir miyim', ts: '2' }] });
     const job = await nextJob(db, HOST);
     expect(job.id).toBe(r.job.id);
     const { data: m } = await db.from('media').select('content_type').eq('id', job.mediaId).single();
@@ -180,7 +218,7 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
     const spoken = [];
     const withSpeech = { ...deps, models: { ...deps.models, speech: 'tts-model' }, speech: async (req) => { spoken.push(req); return new Uint8Array([1, 2, 3, 4]); } };
     const p = `tt${Date.now()}`;
-    const r = await ingest(db, withSpeech, { hostSugoId: HOST, peerSugoId: p, messages: [{ dir: 'out', text: 'selam', ts: '1' }, { dir: 'in', text: 'ses at', ts: '2' }] });
+    const r = await ingest(db, withSpeech, { hostSugoId: HOST, peerSugoId: p, voiceEnabled: true, messages: [{ dir: 'out', text: 'selam', ts: '1' }, { dir: 'in', text: 'ses at', ts: '2' }] });
     const job = await nextJob(db, HOST);
     expect(job).toMatchObject({ id: r.job.id, sendText: false });
     expect(spoken[0]).toMatchObject({ model: 'tts-model', voice: 'Kore', input: 'selam, naber?' });
@@ -191,7 +229,7 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
     expect(gone).toHaveLength(0);
   });
 
-  it('5 dakika cevapsız kalan, sesli mesajı açık kişiye önce sesli, sonra gönderilmemiş fotoğrafla dürtme kuyruğa alır', async () => {
+  it('5 dakika cevapsız kalan kişiye yalnız bir fotoğrafla dürtme kuyruğa alır', async () => {
     const { data: h } = await db.from('hosts').select('id').eq('sugo_id', HOST).single();
     await db.from('hosts').update({ persona: { voice: 'Kore', nudge: true, nudgeMinutes: 5, nudgeLines: ['off baksana'] } }).eq('id', h.id);
     const withSpeech = { ...deps, models: { ...deps.models, speech: 'tts' }, speech: async () => new Uint8Array([1, 2, 3, 4]) };
@@ -202,20 +240,15 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
     const old = new Date(Date.now() - 10 * 60_000).toISOString();
     await db.from('messages').update({ created_at: old }).eq('pair_id', r.pairId);
     await db.from('pairs').update({ last_activity_at: old }).eq('id', r.pairId);
-    const nudge = await nextJob(db, HOST, withSpeech);
-    expect(nudge).toMatchObject({ kind: 'nudge', text: 'off baksana', sendText: false });
-    expect(nudge.mediaId).toBeTruthy();
-    await completeJob(db, nudge.id);
-    await db.from('messages').update({ created_at: old }).eq('pair_id', r.pairId);
-    await db.from('pairs').update({ last_activity_at: old }).eq('id', r.pairId);
     const photo = await nextJob(db, HOST, withSpeech);
     expect(photo).toMatchObject({ kind: 'nudge', sendText: false });
     expect(photo.mediaId).toBeTruthy();
-    expect(photo.mediaId).not.toBe(nudge.mediaId);
+    const { data: media } = await db.from('media').select('content_type').eq('id', photo.mediaId).single();
+    expect(media.content_type).toBe('image/jpeg');
     await completeJob(db, photo.id);
     await db.from('messages').update({ created_at: old }).eq('pair_id', r.pairId);
     await db.from('pairs').update({ last_activity_at: old }).eq('id', r.pairId);
-    expect(await nextJob(db, HOST, withSpeech)).toBeNull(); // aynı sessizlik için en fazla ses + fotoğraf
+    expect(await nextJob(db, HOST, withSpeech)).toBeNull(); // aynı sessizlik için en fazla bir fotoğraf
   });
 
   it('sesli mesajı kapalı kişiye ses göndermez, yalnız fotoğrafla dürtür', async () => {
@@ -230,5 +263,20 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
     expect(nudge).toMatchObject({ kind: 'nudge', sendText: false });
     const { data: media } = await db.from('media').select('content_type').eq('id', nudge.mediaId).single();
     expect(media.content_type).toBe('image/jpeg');
+  });
+
+  it('giden mesajın elmas rozetini kaydeder, sonradan görünen rozeti günceller ve toplamlara yansıtır', async () => {
+    const p = `d${Date.now()}`;
+    const base = [{ dir: 'in', text: 'selam', ts: '1' }];
+    await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, messages: [...base, { dir: 'out', text: 'selam kuzum', ts: '2' }] });
+    await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, messages: [...base, { dir: 'out', text: 'selam kuzum', ts: '2', diamonds: 40 }, { dir: 'in', text: 'nabersin', ts: '3', diamonds: 99 }] });
+    await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, messages: [...base, { dir: 'out', text: 'selam kuzum', ts: '2', diamonds: 40 }, { dir: 'in', text: 'nabersin', ts: '3' }] });
+    const rows = (await db.from('messages').select('direction, diamonds, diamonds_at').eq('pair_id', `${HOST}-${p}`)).data;
+    expect(rows.filter((r) => r.diamonds > 0)).toHaveLength(1);
+    expect(rows.find((r) => r.diamonds === 40).diamonds_at).not.toBeNull();
+    const { data: host } = await db.from('hosts').select('id').eq('sugo_id', HOST).single();
+    const totals = (await db.rpc('diamond_totals')).data.find((r) => r.host_id === host.id);
+    expect(Number(totals.today)).toBe(40);
+    expect(Number(totals.month)).toBe(40);
   });
 });

@@ -9,7 +9,7 @@ export async function POST({ request }) {
   }
   try {
     const messages = b.messages.map((m) => ({ dir: m.dir, text: String(m.text ?? ''), ts: m.ts == null ? '' : String(m.ts), diamonds: Number.isFinite(m.diamonds) ? m.diamonds : 0 }));
-    return json(await ingest(db(), deps(), { hostSugoId: String(b.hostSugoId), peerSugoId: String(b.peerSugoId), peerName: b.peerName ? String(b.peerName) : '', ...(typeof b.voiceEnabled === 'boolean' ? { voiceEnabled: b.voiceEnabled } : {}), messages }));
+    return json(await ingest(db(), deps(), { hostSugoId: String(b.hostSugoId), peerSugoId: String(b.peerSugoId), peerName: b.peerName ? String(b.peerName) : '', ...(typeof b.voiceEnabled === 'boolean' ? { voiceEnabled: b.voiceEnabled } : {}), ...(Number.isInteger(b.unansweredFrom) && b.unansweredFrom >= 0 && b.unansweredFrom < messages.length ? { unansweredFrom: b.unansweredFrom } : {}), messages }));
   } catch (e) {
     return json({ error: e.message }, { status: e instanceof NotFoundError ? 404 : 500 });
   }

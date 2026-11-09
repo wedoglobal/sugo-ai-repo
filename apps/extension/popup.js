@@ -1,36 +1,22 @@
-const keys = ['baseUrl', 'apiKey', 'hostSugoId', 'enabled'];
 const $ = (id) => document.getElementById(id);
-
-chrome.storage.local.get(keys).then((c) => {
-  $('baseUrl').value = c.baseUrl ?? 'http://localhost:5190';
-  $('apiKey').value = c.apiKey ?? '';
-  $('hostSugoId').value = c.hostSugoId ?? '';
-  $('enabled').checked = !!c.enabled;
-});
-
-$('save').onclick = async () => {
-  await chrome.storage.local.set({
-    baseUrl: $('baseUrl').value.trim(),
-    apiKey: $('apiKey').value.trim(),
-    hostSugoId: $('hostSugoId').value.trim(),
-    enabled: $('enabled').checked,
-  });
-  $('status').textContent = 'kaydedildi';
-};
-
-$('testVoice').onclick = async () => {
-  const status = $('voiceStatus');
-  const text = $('voiceText').value.trim();
-  if (!text) { status.textContent = 'Metin boş'; return; }
-  $('testVoice').disabled = true;
-  status.textContent = 'Ses üretiliyor ve gönderiliyor…';
+let hostId;
+async function refresh() {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const res = await chrome.tabs.sendMessage(tab.id, { type: 'test-voice', text });
-    status.textContent = res?.ok ? 'Gönderildi' : `Hata: ${res?.error ?? 'bilinmeyen'}`;
-  } catch {
-    status.textContent = 'Hata: sugo.live sekmesi açık ve yenilenmiş olmalı';
-  } finally {
-    $('testVoice').disabled = false;
-  }
+    const c = await chrome.runtime.sendMessage({ type: 'config' });
+    if (!c) throw new Error('Eklentiyi yeniden yükleyin.');
+    $('baseUrl').value = c.baseUrl;
+    $('hostSugoId').value = c.hostSugoId || 'Panelden profil bağlayın';
+    $('enabled').checked = !!c.enabled;
+    hostId = c.control?.hostId;
+    $('status').textContent = c.control?.synced
+      ? `${c.enabled ? 'Çalışıyor' : 'Durduruldu'} · Panel ile eşitlendi`
+      : c.control?.error || 'Panel bağlantısı bekleniyor.';
+  } catch (e) { $('status').textContent = e.message; }
+}
+$('save').onclick = async () => {
+  const c = await chrome.storage.local.get(['baseUrl']);
+  const base = c.baseUrl || (typeof __VELORA_API_URL__ === 'string' ? __VELORA_API_URL__ : 'https://sugo-host.b-erdincozer.workers.dev');
+  await chrome.tabs.create({ url: `${base.replace(/\/$/, '')}/hosts${hostId ? `/${encodeURIComponent(hostId)}` : ''}` });
 };
+refresh();
+setInterval(refresh, 2000);

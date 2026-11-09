@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { removeRepeatedAddress, removeRepeatedEnding, removeRepeatedLaughter, removeRepeatedWords, removeRepetition } from './repetition.js';
+import { removeRepeatedAddress, removeRepeatedEnding, removeRepeatedLaughter, removeFrequentWords, removeRepeatedWords, removeRepetition } from './repetition.js';
 
 describe('removeRepeatedEnding', () => {
   it('önceki satırı bitiren süzü keser', () => {
@@ -46,5 +46,21 @@ describe('removeRepeatedWords', () => {
   });
   it('geriye iki sözcükten azı kalacaksa metni korur', () => {
     expect(removeRepeatedWords('atölye var', said)).toBe('atölye var');
+  });
+});
+
+describe('removeFrequentWords', () => {
+  const said = ['aşkım naber', 'ya aşkkkım tamam', 'aşkımmm bak', 'iyi', 'x', 'y'];
+  it('3 kez kullanılan sözcük (uzatmalı yazım dahil) sonraki 6 cevapta silinir', () => {
+    expect(removeFrequentWords('tamam askkkkm gel', said)).toBe('tamam gel');
+    expect(removeFrequentWords('tamam aşkım gel', ['aşkım naber', 'aşkım tamam', 'aşkım bak', 'a', 'b', 'c', 'd', 'e', 'f'])).toBe('tamam aşkım gel');
+  });
+  it('2 kullanımda, karşı taraf kullandıysa ya da süre dolduysa dokunmaz', () => {
+    expect(removeFrequentWords('tamam aşkım gel', ['aşkım naber', 'aşkım tamam', 'a'])).toBe('tamam aşkım gel');
+    expect(removeFrequentWords('tamam aşkım gel', said, ['aşkım sen de'])).toBe('tamam aşkım gel');
+  });
+  it('3. kullanımdan sonra sayaç sıfırlanır', () => {
+    const long = ['aşkım a', 'aşkım b', 'aşkım c', 'd', 'e', 'f', 'g', 'h', 'i', 'aşkım j'];
+    expect(removeFrequentWords('tamam aşkım gel', long)).toBe('tamam aşkım gel');
   });
 });

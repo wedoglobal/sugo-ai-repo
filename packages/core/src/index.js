@@ -12,3 +12,4 @@ export * from './nudge.js';
 export * from './greetings.js';
 export * from './lines.js';
 export * from './gift.js';
+export * from './events.js';

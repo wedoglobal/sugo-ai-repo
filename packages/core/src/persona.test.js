@@ -50,6 +50,29 @@ describe('açıklama takibi', () => {
 });
 
 describe('buildReplyMessages', () => {
+  it('son 12 mesajı sırasıyla tutar, örnekleri beşle sınırlar ve yeni mesajları korur', () => {
+    const history = Array.from({ length: 20 }, (_, i) => ({ direction: 'in', text: `geçmiş-${i}!` }));
+    const p = readPersona({ examples: Array.from({ length: 20 }, (_, i) => `örnek-${i}!`) });
+    const user = buildReplyMessages({ kind: 'reply', persona: p, history, unread: ['yeni mesaj'] })[1].content;
+    expect(user).not.toContain('geçmiş-7!');
+    expect(user.indexOf('geçmiş-8!')).toBeLessThan(user.indexOf('geçmiş-19!'));
+    expect(user).toContain('örnek-4!');
+    expect(user).not.toContain('örnek-5!');
+    expect(user).toContain('yeni mesaj');
+    expect(history).toHaveLength(20);
+    expect(p.examples).toHaveLength(20);
+  });
+  it('uzun geçmişte 6000 karakteri aşmaz ve en yeni mesajı tutar', () => {
+    const history = Array.from({ length: 20 }, (_, i) => ({ direction: 'out', text: `${i}: ${'x'.repeat(3990)}` }));
+    const user = buildReplyMessages({ kind: 'reply', persona, history, unread: ['soru'] })[1].content;
+    const context = user.split('Önceki konuşma (eski -> yeni):\n')[1].split('\n\nCevaplanacak')[0];
+    expect(context.length).toBeLessThanOrEqual(6000);
+    expect(context).toContain('19: ');
+    expect(context).not.toContain('18: ');
+    const huge = buildReplyMessages({ kind: 'reply', persona, history: [{ direction: 'in', text: 'a'.repeat(10000) }], unread: ['yeni'] })[1].content;
+    expect(huge).toContain('…');
+    expect(huge).toContain('yeni');
+  });
   const msgs = buildReplyMessages({
     kind: 'reply', persona, disclosed: { name: 'Ahu' },
     permanent: { job: { value: 'doktor' } }, temp: ['yorgun'], unread: ['nasılsın'],
