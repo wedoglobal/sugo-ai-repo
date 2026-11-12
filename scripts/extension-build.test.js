@@ -34,7 +34,7 @@ describe('korumalı dağıtım paketleri', () => {
     const elements = new Map();
     const getElementById = (id) => { if (!elements.has(id)) elements.set(id, {}); return elements.get(id); };
     const set = vi.fn();
-    context(code, { document: { getElementById }, setInterval: vi.fn(), chrome: { runtime: { sendMessage: async () => ({ baseUrl: settings.baseUrl, hostSugoId: '123', enabled: false, control: { hostId: 'host', synced: true } }) }, storage: { local: { set } } } });
+    context(code, { document: { getElementById, activeElement: null }, setInterval: vi.fn(), chrome: { runtime: { sendMessage: async () => ({ baseUrl: settings.baseUrl, hostSugoId: '123', enabled: false, control: { hostId: 'host', synced: true } }) }, storage: { local: { set } } } });
     await vi.waitFor(() => expect(elements.has('baseUrl')).toBe(true));
     expect(elements.get('baseUrl').value).toBe(settings.baseUrl);
     expect(elements.get('hostSugoId').value).toBe('123');

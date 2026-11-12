@@ -7,15 +7,25 @@
   let busy = $state(false);
   let message = $state('Eklenti kontrol ediliyor…');
   let failed = $state(false);
+  let remote = $state(null);
   let checking = 0;
   let epoch = 0;
   const active = $derived(override?.active ?? host.active);
   const revision = $derived(override?.revision ?? host.updated_at);
   const bound = $derived(receipt?.hostId === host.id);
-  const synced = $derived(bound && receipt?.synced && receipt.active === active && receipt.revision === revision);
+  const localSynced = $derived(bound && receipt?.synced && receipt.active === active && receipt.revision === revision);
+  const remoteSynced = $derived(!localSynced && !!remote);
+  const synced = $derived(localSynced || remoteSynced);
+  async function checkRemote() {
+    try {
+      const { lastSeenAt, now } = await (await fetch(`/hosts/${host.id}/control`, { cache: 'no-store' })).json();
+      remote = lastSeenAt && Date.parse(now) - Date.parse(lastSeenAt) < 90000 ? { at: lastSeenAt } : null;
+    } catch { remote = null; }
+  }
   async function check(force = false) {
     if (checking && !force) return;
     checking++;
+    checkRemote();
     const token = epoch;
     try {
       const next = await extensionRequest({ control: true, action: force ? 'refresh' : 'read' });
@@ -58,8 +68,8 @@
   });
 </script>
 <div class="profile-control" class:compact>
-  <div class="actions"><button class:stop={active} disabled={busy} onclick={change}>{busy ? 'İşleniyor…' : active ? 'Ⅱ Durdur' : '▷ Başlat'}</button>{#if !bound}<button class="bind" disabled={busy} onclick={bind}>Bu Chrome’a bağla</button>{:else}<button class="bind" disabled={busy} onclick={() => check(true)}>Eşitle ↻</button>{/if}</div>
-  <p class:good={synced} class:failed role="status"><span>{synced ? '●' : '○'}</span> {synced ? `Eşitlendi · ${new Date(receipt.checkedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : message}</p>
+  <div class="actions"><button class:stop={active} disabled={busy} onclick={change}>{busy ? 'İşleniyor…' : active ? 'Ⅱ Durdur' : '▷ Başlat'}</button>{#if !bound && !remoteSynced}<button class="bind" disabled={busy} onclick={bind}>Bu Chrome’a bağla</button>{:else}<button class="bind" disabled={busy} onclick={() => check(true)}>Eşitle ↻</button>{/if}</div>
+  <p class:good={synced} class:failed role="status"><span>{synced ? '●' : '○'}</span> {localSynced ? `Eşitlendi · ${new Date(receipt.checkedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : remoteSynced ? `Eşitlendi · eklenti bağlı, son okuma ${new Date(remote.at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : message}</p>
   {#if !compact}<small>Başlat/durdur otomasyonu kontrol eder; GPS ve proxy ayarları bağımsızdır. Durdurma yeni işleri keser; gönderimi başlamış bir mesaj geri alınamaz.</small>{/if}
 </div>
 <style>

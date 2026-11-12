@@ -36,13 +36,13 @@ async function locationPermissions(profiles, blocked = []) {
   if (!domains.length && !previous.length) return;
   // Yarım kalan bir işlemde sonraki uyanışın temizleyebilmesi için hedef önce kaydedilir.
   await chrome.storage.local.set({ gpsPermissionDomains: domains });
-  await chrome.contentSettings.geolocation.clear({ scope: 'regular' });
+  await chrome.contentSettings.location.clear({ scope: 'regular' });
   for (const domain of domains) {
     for (const scheme of ['http', 'https']) {
       const pattern = `${scheme}://${domain}/*`;
-      await chrome.contentSettings.geolocation.set({ primaryPattern: pattern, secondaryPattern: pattern, setting: blocked.includes(domain) ? 'block' : 'allow', scope: 'regular' });
+      await chrome.contentSettings.location.set({ primaryPattern: pattern, secondaryPattern: pattern, setting: blocked.includes(domain) ? 'block' : 'allow', scope: 'regular' });
     }
-    const setting = await chrome.contentSettings.geolocation.get({ primaryUrl: `https://${domain}/` });
+    const setting = await chrome.contentSettings.location.get({ primaryUrl: `https://${domain}/` });
     if (!blocked.includes(domain) && setting.setting !== 'allow') throw new Error(`${domain}: Chrome konum izni kurum politikası veya başka bir kural tarafından engelleniyor.`);
   }
 }
@@ -76,7 +76,11 @@ export async function networkMessage(msg) {
       const list = state.hosts[msg.host] ?? [];
       state.hosts[msg.host] = [...list.filter((x) => x.domain !== p.domain && x.domain !== msg.originalDomain), p];
     } else if (msg.action === 'delete') state.hosts[msg.host] = (state.hosts[msg.host] ?? []).filter((p) => p.domain !== msg.domain);
-    else if (msg.action === 'activate') state.activeHost = msg.host;
+    else if (msg.action === 'replace') {
+      // Panelin sunucuda tuttuğu profiller bu Chrome'a bağlı profil için tek kaynaktır.
+      state.hosts[msg.host] = (Array.isArray(msg.profiles) ? msg.profiles : []).map(validateProfile);
+      state.activeHost = msg.host;
+    } else if (msg.action === 'activate') state.activeHost = msg.host;
     else if (msg.action === 'deactivate' && state.activeHost === msg.host) state.activeHost = '';
     else throw new Error('İşlem geçersiz.');
     const endpoints = new Map();
@@ -109,7 +113,7 @@ chrome.debugger.onDetach.addListener(({ tabId }, reason) => {
     const domain = tabDomains.get(tabId);
     if (domain) for (const scheme of ['http', 'https']) {
       const pattern = `${scheme}://${domain}/*`;
-      chrome.contentSettings.geolocation.set({ primaryPattern: pattern, secondaryPattern: pattern, setting: 'block', scope: 'regular' }).catch(() => {});
+      chrome.contentSettings.location.set({ primaryPattern: pattern, secondaryPattern: pattern, setting: 'block', scope: 'regular' }).catch(() => {});
     }
     suppressed.add(tabId); chrome.storage.session.set({ gpsSuppressed: [...suppressed] }); statusError(`gps:${tabId}`, `GPS bağlantısı kesildi (${reason}). Panelden yeniden uygulayın.`); }
 });

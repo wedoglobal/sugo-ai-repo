@@ -9,7 +9,7 @@ beforeEach(async () => {
   chrome = {
     storage: { local: storage(local), session: storage(session) },
     tabs: { query: vi.fn(async () => [{ id: 1, url: 'https://sugo.live' }, { id: 2, url: 'https://other.test' }]), onUpdated: event(), onRemoved: event() },
-    contentSettings: { geolocation: { clear: vi.fn(async () => {}), set: vi.fn(async () => {}), get: vi.fn(async () => ({ setting: 'allow' })) } },
+    contentSettings: { location: { clear: vi.fn(async () => {}), set: vi.fn(async () => {}), get: vi.fn(async () => ({ setting: 'allow' })) } },
     proxy: { settings: { get: vi.fn(async () => ({ levelOfControl: 'controllable_by_this_extension' })), set: vi.fn(async () => {}), clear: vi.fn(async () => {}) }, onProxyError: event() },
     debugger: { attach: vi.fn(async () => {}), detach: vi.fn(async () => {}), sendCommand: vi.fn(async () => {}), getTargets: vi.fn(async () => []), onDetach: event() },
     webRequest: { onAuthRequired: event(), onCompleted: event(), onErrorOccurred: event() },
@@ -67,7 +67,7 @@ describe('Chrome ağ yönetimi', () => {
   it('GPS etkin sitede izin uygular; kapatınca yalnız kendi izin kurallarını kaldırır', async () => {
     await networkMessage({ action: 'save', host: 'host', profile: p() });
     await networkMessage({ action: 'activate', host: 'host' });
-    expect(chrome.contentSettings.geolocation.set).toHaveBeenCalledWith(expect.objectContaining({ primaryPattern: 'https://sugo.live/*', setting: 'allow' }));
+    expect(chrome.contentSettings.location.set).toHaveBeenCalledWith(expect.objectContaining({ primaryPattern: 'https://sugo.live/*', setting: 'allow' }));
     const changed = p(); changed.gps.enabled = false;
     await networkMessage({ action: 'save', host: 'host', profile: changed });
     expect(local.gpsPermissionDomains).toEqual([]);
@@ -78,7 +78,7 @@ describe('Chrome ağ yönetimi', () => {
     const result = await networkMessage({ action: 'activate', host: 'host' });
     expect(result.sync.status).toBe('error');
     expect(result.sync.errors[0]).toContain('DevTools');
-    expect(chrome.contentSettings.geolocation.set).toHaveBeenLastCalledWith(expect.objectContaining({ primaryPattern: 'https://sugo.live/*', setting: 'block' }));
+    expect(chrome.contentSettings.location.set).toHaveBeenLastCalledWith(expect.objectContaining({ primaryPattern: 'https://sugo.live/*', setting: 'block' }));
   });
 
 });

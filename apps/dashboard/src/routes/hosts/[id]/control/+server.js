@@ -1,5 +1,10 @@
 import { json } from '@sveltejs/kit';
 import { db, must } from '$lib/server/deps.js';
+/** Eklentinin sunucuyu son okuma zamanı; panel başka bir Chrome'da açık olsa da eşitlenmeyi buradan gösterir. */
+export async function GET({ params }) {
+  const { data } = await db().from('hosts').select('last_seen_at').eq('id', params.id).maybeSingle();
+  return json({ lastSeenAt: data?.last_seen_at ?? null, now: new Date().toISOString() }, { headers: { 'cache-control': 'no-store' } });
+}
 export async function POST({ params, request }) {
   const input = await request.json().catch(() => null);
   if (typeof input?.active !== 'boolean') return json({ error: 'Başlat/durdur durumu gerekli' }, { status: 400 });

@@ -2,3 +2,6 @@
 
 /* Varsayılan görünüm Chrome popup yüksekliğine sığar; ayrıntılar açılınca kaydırılır. */
 .popup-header{padding:14px 18px}main{padding:12px 12px 0}.panel{padding:12px;margin-bottom:10px}.section-heading{margin-bottom:10px}.section-heading p{display:none}.section-icon{height:27px;min-width:27px;font-size:20px}.field input{padding:8px 10px}.control-row{padding:10px 0}.control-copy small{display:none}.save-row{padding-top:10px}.primary,.secondary{padding:9px 11px}.connection-panel .section-heading{margin-bottom:10px}.domain-label{padding:6px 8px;min-height:26px}.last{padding-bottom:6px}.network-status{padding:6px 8px;margin:3px 0 9px}.utilities{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.utilities:has(details[open]){grid-template-columns:1fr}.utility{margin:0}summary{padding:12px 10px}.summary-note{font-size:0}.summary-note:after{margin-left:0}.utilities:has(details[open]) .summary-note{font-size:8px}.utilities:has(details[open]) .summary-note:after{margin-left:9px}footer{padding:5px 16px 12px}
+
+.net-fields{display:none;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 10px}.net-fields.open{display:grid}.net-fields .field{margin:0}.full{width:100%;margin-top:8px}
+#networkStatus{white-space:pre-line}

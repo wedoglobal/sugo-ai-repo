@@ -26,10 +26,13 @@ export async function queueNudge(db, deps, host, now = deps.now?.() ?? new Date(
     .lt('last_activity_at', new Date(after).toISOString())
     .gt('last_activity_at', new Date(now.getTime() - NUDGE_WINDOW_MS).toISOString()));
 
+  if (!pairs.length) return null;
+  // Aktif işi olan sohbetler tek sorguda elenir; kalanlar için ayrı ayrı sorgu atılmaz.
+  const busy = new Set(must(await db.from('jobs').select('pair_id').eq('host_id', host.id).in('status', ['pending', 'processing'])).map((j) => j.pair_id));
+
   for (const pair of pairs) {
+    if (busy.has(pair.id)) continue;
     if (visiblePairIds ? !visiblePairIds.includes(pair.id) : pair.delivery_retry_at && ms(pair.delivery_retry_at) > now.getTime()) continue;
-    const active = must(await db.from('jobs').select('id').eq('pair_id', pair.id).in('status', ['pending', 'processing']).limit(1));
-    if (active.length) continue;
     const [last] = must(await db.from('messages').select('direction, created_at').eq('pair_id', pair.id).order('id', { ascending: false }).limit(1));
     if (!last || last.direction !== 'out' || ms(last.created_at) > after) continue;
     const [lastIn] = must(await db.from('messages').select('created_at').eq('pair_id', pair.id).eq('direction', 'in').order('id', { ascending: false }).limit(1));

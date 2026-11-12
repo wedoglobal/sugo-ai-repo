@@ -72,7 +72,8 @@ async function openChat(row) {
 
 /** İş bitince sohbetten çıkar; boşta beklerken yeni mesajlar otomatik okunmasın. */
 async function leaveChat() {
-  const header = [...document.querySelectorAll('.conv-header-row')].find((b) => b.querySelector('.conv-header-title')?.innerText.trim().toLocaleLowerCase('tr') === 'bildirimler');
+  const NOTIFICATION_TITLES = ['bildirimler', 'notifications', 'notification'];
+  const header = [...document.querySelectorAll('.conv-header-row')].find((b) => NOTIFICATION_TITLES.includes(b.querySelector('.conv-header-title')?.innerText.trim().toLocaleLowerCase('tr')));
   if (!header) return console.warn('[sugo-host] Bildirimler satırı bulunamadı');
   humanClick(header);
   await sleep(200);
@@ -437,6 +438,8 @@ const skipped = new Set();
  * Normal mesajlar en eskiden başlayarak seçilir; eşleşmeler ancak normal mesaj işi kalmayınca açılır.
  */
 const GREET_RETRY_MS = 3 * 60 * 1000;
+const MATCH_EVERY_REPLIES = 1;
+const MATCH_MIN_GAP_MS = 5000;
 const greeted = new Map();
 let lastMatchRepairAt = 0;
 let normalRepliesSinceRepair = 0;
@@ -620,8 +623,8 @@ async function tick() {
     const cfg = await getConfig();
     if (!cfg.enabled || !cfg.hostSugoId || !cfg.apiKey) return false;
     await loadPending(cfg);
-    // Sürekli normal trafik varken de dört cevaptan sonra, dakikada bir eşleşme onarılır.
-    if (normalRepliesSinceRepair >= 4 && Date.now() - lastMatchRepairAt >= 60000) {
+    // Sürekli normal trafik varken de her cevaptan sonra (en erken 5 sn arayla) bir eşleşme açılır.
+    if (normalRepliesSinceRepair >= MATCH_EVERY_REPLIES && Date.now() - lastMatchRepairAt >= MATCH_MIN_GAP_MS) {
       const repair = nextMatchRow();
       if (repair) {
         lastMatchRepairAt = Date.now();

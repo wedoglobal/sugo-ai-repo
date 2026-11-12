@@ -8,6 +8,21 @@ async function localConfig() {
   const c = await chrome.storage.local.get(['baseUrl', 'apiKey', 'hostSugoId', 'enabled']);
   return { ...c, baseUrl: c.baseUrl || defaults.baseUrl, apiKey: c.apiKey || defaults.apiKey };
 }
+/** Panelde kaydedilen GPS/proxy profillerini bu Chrome'a uygular; yalnız içerik değişince veya yerel kayıt farklıysa çalışır. */
+async function syncNetwork(host) {
+  const apply = globalThis.veloraNetworkMessage;
+  if (!Array.isArray(host.network) || !apply) return;
+  const signature = JSON.stringify([host.id, host.network]);
+  const local = await chrome.storage.local.get(['networkSyncSig', 'networkSyncTriedAt', 'networkProfiles']);
+  if (local.networkSyncSig === signature && local.networkProfiles?.activeHost === host.id) return;
+  if (local.networkSyncSig !== signature && Date.now() - (local.networkSyncTriedAt ?? 0) < 30000) return;
+  await chrome.storage.local.set({ networkSyncTriedAt: Date.now() });
+  try {
+    await apply({ action: 'replace', host: host.id, profiles: host.network });
+    await chrome.storage.local.set({ networkSyncSig: signature });
+    await chrome.storage.session.set({ networkSyncError: '' });
+  } catch (e) { await chrome.storage.session.set({ networkSyncError: e.message, proxyError: e.message }); }
+}
 async function resolve(c, force = false) {
   if (!c.apiKey) return { ...c, enabled: false, control: { synced: false, error: 'Eklentide API anahtarı yok. Kaynak klasör yerine `pnpm extension:package` ile üretilen paketi Chrome’a yükleyin.' } };
   if (!c.hostSugoId) return { ...c, enabled: false, control: { synced: false, error: 'Panelden bu Chrome’a bir profil bağlayın.' } };
@@ -21,6 +36,7 @@ async function resolve(c, force = false) {
       if (!response.ok) throw new Error(`Panel bağlantısı HTTP ${response.status}`);
       const { host } = await response.json();
       if (!host?.id || String(host.sugoId) !== String(c.hostSugoId) || typeof host.active !== 'boolean' || !host.revision) throw new Error('Panelden geçerli profil durumu alınamadı.');
+      await syncNetwork(host).catch(() => {});
       status = { synced: true, hostId: host.id, sugoId: host.sugoId, name: host.name, active: host.active, revision: host.revision, checkedAt: new Date().toISOString() };
     } catch (e) {
       status = { synced: false, sugoId: c.hostSugoId, active: false, error: e.message, checkedAt: new Date().toISOString() };

@@ -1,6 +1,8 @@
 import './automation.js';
 import './control.js';
 import { networkMessage } from './network.js';
+// control.js bağımsız test edilebilsin diye ağ profili uygulayıcısı buradan verilir.
+globalThis.veloraNetworkMessage = networkMessage;
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg?.type !== 'sugo-network') return false;

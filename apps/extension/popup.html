@@ -14,16 +14,20 @@
   <main>
     <section class="panel">
       <div class="section-heading"><span class="section-icon mint">✧</span><div><h1>Otomasyon</h1><p>Profilini bağla, akışı yönet.</p></div></div>
-      <label class="field" for="hostSugoId">Profil ID<input id="hostSugoId" type="text" inputmode="numeric" placeholder="Platformdaki profil kimliği" autocomplete="off" readonly></label>
+      <label class="field" for="hostSugoId">Profil ID<input id="hostSugoId" type="text" inputmode="numeric" placeholder="Platformdaki profil kimliği" autocomplete="off"></label>
       <label class="control-row"><span class="control-copy"><strong>Otomasyon durumu</strong><small>Bu profilin sohbetlerini yönetir.</small></span><span class="switch"><input id="enabled" type="checkbox" disabled><span class="track"></span></span></label>
+      <div class="save-row"><button id="bind" class="primary">Bu Chrome'a bağla</button></div>
       <div class="save-row"><span id="status" role="status" aria-live="polite"></span><button id="save" class="primary">Profili panelde yönet <span aria-hidden="true">↗</span></button></div>
     </section>
     <section class="panel connection-panel">
       <div class="section-heading"><span class="section-icon lavender">◎</span><div><h2>Konum ve bağlantı</h2><p>Aktif siteye uygulanan ayarlar.</p></div></div>
       <div class="domain-label"><span class="domain-dot"></span><span id="networkDomain">Aktif site algılanıyor…</span></div>
-      <label class="control-row"><span class="control-copy"><strong>GPS konumu</strong><small>Siteye gösterilen konum.</small></span><span class="switch"><input id="networkGps" type="checkbox" disabled><span class="track"></span></span></label>
-      <label class="control-row last"><span class="control-copy"><strong>IPv4 proxy</strong><small>Bu domain’in bağlantı adresi.</small></span><span class="switch"><input id="networkProxy" type="checkbox" disabled><span class="track"></span></span></label>
+      <label class="control-row"><span class="control-copy"><strong>GPS konumu</strong><small>Siteye gösterilen konum.</small></span><span class="switch"><input id="networkGps" type="checkbox"><span class="track"></span></span></label>
+      <div id="gpsFields" class="net-fields"><label class="field">Enlem<input id="netLat" type="number" step="any" min="-90" max="90"></label><label class="field">Boylam<input id="netLon" type="number" step="any" min="-180" max="180"></label></div>
+      <label class="control-row last"><span class="control-copy"><strong>IPv4 proxy</strong><small>Bu domain’in bağlantı adresi.</small></span><span class="switch"><input id="networkProxy" type="checkbox"><span class="track"></span></span></label>
+      <div id="proxyFields" class="net-fields"><label class="field">Protokol<select id="netProto"><option value="http">HTTP</option><option value="https">HTTPS</option><option value="socks5">SOCKS5</option></select></label><label class="field">IP<input id="netIp" type="text" autocomplete="off" placeholder="1.2.3.4"></label><label class="field">Port<input id="netPort" type="number" min="1" max="65535"></label><label class="field">Kullanıcı<input id="netUser" type="text" autocomplete="off"></label><label class="field">Şifre<input id="netPass" type="password" autocomplete="off"></label></div>
       <p id="networkStatus" class="network-status" role="status" aria-live="polite">Bağlantı kontrol ediliyor…</p>
+      <button id="networkSave" class="primary full">Bu site için kaydet ve uygula</button>
       <button id="networkOpen" class="secondary full">Harita ve site profilleri <span aria-hidden="true">↗</span></button>
     </section>
     <details class="utility"><summary><span>Bağlantı bilgileri</span><span class="summary-note">Panelden yönetilir</span></summary><div class="utility-body"><p class="helper">Profil başlat/durdur, GPS ve proxy ayarları panelden uygulanır. Bu popup yalnız durumu gösterir.</p><label class="field" for="baseUrl">Panel / API adresi<input id="baseUrl" type="text" readonly></label></div></details>

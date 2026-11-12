@@ -415,13 +415,18 @@ export async function nextJob(db, hostSugoId, deps, { replyOnly = false, visible
   if (host.active === false) return null;
   const visiblePairIds = Array.isArray(visiblePeerIds) ? [...new Set(visiblePeerIds)].slice(0, 1000).map((id) => pairId(host.sugo_id, id)) : null;
   if (visiblePairIds?.length === 0) return null;
-  if (deps && !replyOnly) await queueNudge(db, deps, host, undefined, { visiblePairIds }).catch(() => null);
+  // Dürtme taraması pahalıdır; hazır cevap/selam varsa beklemeden verilir, tarama yalnız kuyruk boşken yapılır.
+  let nudgeScanned = false;
   let recovered = false;
   for (;;) {
     const rows = must(await db.rpc(visiblePairIds ? 'claim_available_job' : replyOnly ? 'claim_next_reply_job' : 'claim_next_job',
       visiblePairIds ? { p_host: host.id, p_pair_ids: visiblePairIds, p_reply_only: replyOnly } : { p_host: host.id }));
     const job = rows?.[0];
     if (!job) {
+      if (deps && !replyOnly && !nudgeScanned) {
+        nudgeScanned = true;
+        if (await queueNudge(db, deps, host, undefined, { visiblePairIds }).catch(() => null)) continue;
+      }
       if (!replyOnly || !deps || recovered) return null;
       recovered = true;
       const repair = must(await db.rpc(visiblePairIds ? 'queue_available_reply' : 'queue_unanswered_reply',

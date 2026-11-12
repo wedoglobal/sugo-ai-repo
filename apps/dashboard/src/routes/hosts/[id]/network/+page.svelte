@@ -11,27 +11,27 @@
   let message = $state('');
   let error = $state('');
   let showPassword = $state(false);
-  const active = $derived(state?.activeHost === data.host.id);
-  function bridge(payload) {
-    return new Promise((resolve, reject) => {
-      const id = crypto.randomUUID();
-      const timeout = setTimeout(() => { window.removeEventListener('message', receive); reject(new Error('Eklentiye ulaşılamadı. GPS ve proxy için Velora AI 0.2.0 veya üstünü yükleyip sayfayı yenileyin. Eski sürümünüz otomasyon için çalışmaya devam eder.')); }, 10000);
-      function receive(e) {
-        if (e.source !== window || e.origin !== location.origin || e.data?.channel !== 'sugo-network-response' || e.data.id !== id) return;
-        clearTimeout(timeout); window.removeEventListener('message', receive);
-        if (e.data.result?.ok) resolve(e.data.result.data); else reject(new Error(e.data.result?.error ?? 'Bağlantı hatası'));
-      }
-      window.addEventListener('message', receive);
-      window.postMessage({ channel: 'sugo-network-request', id, payload: { ...payload, host: data.host.id } }, location.origin);
-    });
+  const active = $derived(!!state);
+  /** Profiller sunucuda tutulur; bu host'a bağlı Chrome eklentisi bunları kendi kontrol okumasında alıp uygular. */
+  async function api(options) {
+    const response = await fetch(`/hosts/${data.host.id}/network-profiles`, { cache: 'no-store', ...options });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || 'İşlem başarısız.');
+    return body;
   }
+  function seen(body) { return !!body.lastSeenAt && Date.parse(body.now) - Date.parse(body.lastSeenAt) < 90000; }
+  function adopt(body) { state = { profiles: body.profiles, activeHost: data.host.id, connected: seen(body), lastSeenAt: body.lastSeenAt }; }
   async function run(action, extra = {}) {
     busy = true; error = ''; message = '';
-    try { state = await bridge({ action, ...extra }); if (action !== 'read') {
-      if (state.sync?.status === 'error') error = `Kaydedildi; uygulama onaylanmadı: ${state.sync.errors.join('; ')}`;
-      else message = state.sync?.status === 'saved' ? 'Eklenti kaydı onayladı. Bağlantı ayarlarını etkinleştirince uygulanır.' : 'Eklenti ayarları kaydetti ve uyguladığını onayladı.';
-    } }
-    catch (e) { error = e.message; }
+    try {
+      if (action === 'read') adopt(await api());
+      else {
+        let list = (state?.profiles ?? []).filter((p) => p.domain !== extra.originalDomain && p.domain !== extra.domain);
+        if (action === 'save') list = [...list, extra.profile];
+        adopt(await api({ method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ profiles: list }) }));
+        message = state.connected ? 'Kaydedildi. Bağlı Chrome ayarı birkaç saniye içinde uygular.' : 'Kaydedildi. Eklentinin bağlı olduğu Chrome açılınca ayar uygulanır.';
+      }
+    } catch (e) { error = e.message; }
     finally { busy = false; }
   }
   function edit(p) { draft = structuredClone($state.snapshot(p)); originalDomain = p.domain; showPassword = false; message = ''; }
@@ -40,7 +40,7 @@
     run('read');
     const timer = setInterval(async () => {
       if (busy || !state) return;
-      try { state = await bridge({ action: 'read' }); } catch { state = null; }
+      try { adopt(await api()); } catch { /* Sonraki turda yeniden denenir. */ }
     }, 4000);
     return () => clearInterval(timer);
   });
@@ -48,11 +48,10 @@
 <svelte:head><title>Konum ve bağlantı · {data.host.name || 'AI profili'} · Velora AI</title></svelte:head>
 <div class="network-page">
   <a class="back" href="/hosts/{data.host.id}">← {data.host.name || 'AI profili'} / Profil ayarları</a>
-  <header><div><div class="eyebrow">CONNECTION STUDIO</div><h1>Konum ve bağlantı<span>.</span></h1><p>Bir site seç, konumunu belirle, bağlantını yönet.</p></div><span class:connected={state} class="connection"><i></i>{state ? 'Eklenti bağlı' : 'Bağlantı bekleniyor'}</span></header>
+  <header><div><div class="eyebrow">CONNECTION STUDIO</div><h1>Konum ve bağlantı<span>.</span></h1><p>Bir site seç, konumunu belirle, bağlantını yönet.</p></div><span class:connected={state?.connected} class="connection"><i></i>{state?.connected ? 'Eklenti bağlı' : 'Eklenti bekleniyor'}</span></header>
   <div class="card"><ProfileControl host={data.host} /></div>
   <details class="setup-guide" open={!state}><summary class="setup-summary"><span>✧ Velora AI kurulumu</span><span>{state ? 'Bağlantı hazır · Rehberi aç' : '3 kolay adım'}</span></summary><div class="setup-intro"><span class="guide-kicker">İLK KEZ Mİ KULLANIYORSUN?</span><h2>Üç adımda hazır.</h2><p>Otomasyon, GPS ve proxy tek Velora AI eklentisinde. GPS ve proxy kullanmak için 0.2.0 veya üstüne geç; eski sürümler otomasyona devam eder.</p></div><div class="setup-steps"><div><span class="step-number">01</span><strong>Velora AI’ı ekle</strong><p>ZIP’i çıkart ve Chrome’da paketlenmemiş eklenti olarak yükle.</p><a href="/downloads/velora-ai-extension.zip" download>Velora AI’ı indir ↗</a></div><div><span class="step-number">02</span><strong>Siteyi hazırla</strong><p>Domain’i gir. Haritadan konumunu seç veya proxy bilgilerini ekle.</p><button type="button" class="guide-button" disabled={busy} onclick={() => run('read')}>Eklenti bağlantısını kontrol et ↻</button></div><div><span class="step-number">03</span><strong>Kaydet ve etkinleştir</strong><p>Siteyi kaydet; bu profilin bağlantı ayarlarını üstteki düğmeden etkinleştir.</p><span class="step-note">GPS ve proxy ayrı ayrı çalışır.</span></div></div></details>
-  <div class="activation"><div><strong>{active ? 'Bu profilin bağlantı ayarları etkin' : 'Bağlantı ayarları henüz etkin değil'}</strong><p>{active ? 'Bu Chrome’daki eşleşen sitelere kaydettiğiniz ayarlar uygulanır.' : 'Önce site ayarlarını kaydedin. Ardından bu Chrome’da etkinleştirin.'}</p></div><button disabled={busy || !state} class:secondary={active} onclick={() => run(active ? 'deactivate' : 'activate')}>{active ? 'Bağlantı ayarlarını kapat' : 'Bu profil için etkinleştir'}</button></div>
-  {#if state?.sync?.host === data.host.id}<p class="hint" role="status">Son uygulama onayı: {new Date(state.sync.checkedAt).toLocaleTimeString('tr-TR')} · {state.sync.status === 'applied' ? 'Eklenti uyguladı' : state.sync.status === 'saved' ? 'Kaydedildi; henüz etkin değil' : 'Uygulama hatası; aşağıdaki ayrıntıları kontrol edin'}</p>{/if}
+  {#if state}<p class="hint" role="status">{state.connected ? `Eklenti bağlı · son okuma ${new Date(state.lastSeenAt).toLocaleTimeString('tr-TR')}` : 'Bu profile bağlı eklenti şu an yanıt vermiyor; kaydettiğiniz ayarlar eklenti açılınca uygulanır.'}</p>{/if}
   {#if error}<div class="notice error" role="alert">{error} <button class="secondary" disabled={busy} onclick={() => run('read')}>Yeniden bağlan</button></div>{/if}
   {#if message}<div class="notice success" role="status">{message}</div>{/if}
   <div class="mode-explainer"><div><span class="mode-symbol gps">◎</span><div><strong>GPS = siteye gösterilen konum</strong><p>IP adresini değiştirmez. Haritadan istediğin noktayı seç.</p></div></div><div><span class="mode-symbol proxy">⇄</span><div><strong>Proxy = bağlantının çıkış adresi</strong><p>GPS’i değiştirmez. Aynı domain’in tüm sekmelerinde çalışır.</p></div></div></div>
@@ -63,7 +62,7 @@
       {#each state?.profiles ?? [] as profile (profile.domain)}
         <button class="profile" class:selected={originalDomain === profile.domain} onclick={() => edit(profile)}><strong>{profile.domain}</strong><small><span class:on={profile.gps.enabled}>● GPS</span><span class:on={profile.proxy.enabled}>● Proxy</span></small></button>
       {:else}<p class="empty">Henüz site eklenmedi.<br />İlk profilinizi sağdan oluşturun.</p>{/each}
-      <div class="privacy"><strong>↳ Yalnızca bu cihazda</strong><p>Profiller ve şifreler Chrome’un yerel deposunda saklanır. Sunucuya gönderilmez.</p></div>
+      <div class="privacy"><strong>↳ Sunucuda saklanır</strong><p>Profiller ve proxy şifreleri panel veritabanında tutulur ve yalnız bağlı eklentiye iletilir.</p></div>
     </aside>
     <form onsubmit={(e) => { e.preventDefault(); run('save', { profile: $state.snapshot(draft), originalDomain }).then(() => { if (!error) originalDomain = new URL(draft.domain.includes('://') ? draft.domain : `https://${draft.domain}`).hostname.toLowerCase().replace(/\.$/, ''); }); }}>
       <section class="editor-top"><div class="eyebrow">{originalDomain ? 'PROFİLİ DÜZENLE' : 'YENİ PROFİL'}</div><label for="domain">Web sitesi</label><input id="domain" class="domain" bind:value={draft.domain} required placeholder="ör. example.com" /><p class="hint">Tam domain eşleşir. www ve diğer alt domain’ler için ayrı profil ekleyin.</p></section>
@@ -81,7 +80,7 @@
         {#if draft.proxy.protocol === 'socks5'}<p class="notice">Chrome, SOCKS5 şifre doğrulamasını desteklemez. Şifresiz / IP izin listeli SOCKS5 ya da şifreli HTTP/HTTPS kullanın.</p>{/if}
         <div class="protection"><strong>◈ Fail-closed yönlendirme</strong><p>Proxy kuralında DIRECT yedeği yoktur. Proxy hatasında bağlantı başarısız olur. Diğer domain’lere bu eklenti proxy atamaz.</p></div>
       </section>
-      <footer><span>{active ? 'Kaydettiğiniz değişiklikler hemen uygulanır.' : 'Önce kaydedin, sonra üstten etkinleştirin.'}</span><div>{#if originalDomain}<button type="button" class="delete" disabled={busy || !state} onclick={async () => { await run('delete', { domain: originalDomain }); if (!error) reset(); }}>Profili sil</button>{/if}<button disabled={busy || !state}>{busy ? 'İşleniyor…' : 'Profili kaydet'}</button></div></footer>
+      <footer><span>Kaydettiğiniz değişiklikler bağlı Chrome'a birkaç saniyede ulaşır.</span><div>{#if originalDomain}<button type="button" class="delete" disabled={busy || !state} onclick={async () => { await run('delete', { domain: originalDomain }); if (!error) reset(); }}>Profili sil</button>{/if}<button disabled={busy || !state}>{busy ? 'İşleniyor…' : 'Profili kaydet'}</button></div></footer>
     </form>
   </div>
   <div class="footnotes"><button type="button" class="secondary" disabled={busy} onclick={() => run('read')}>Bağlantı durumunu yenile</button><p><strong>GPS ve IP bağımsızdır.</strong> GPS IP’yi, proxy GPS’i değiştirmez. PAC kuralları hedef domain bazında tüm sekmelerde geçerlidir; farklı CDN/API domain’leri ayrı profil ister.</p><p>Chrome’da aynı anda tek AI profilinin bağlantı ayarları etkin olabilir. Eklentiyi kapatmak, başka bir proxy yöneticisi veya kurum politikası korumayı geçersiz kılabilir. Bu özellik tüm cihaz trafiğini kapsayan bir VPN değildir.</p><p><a class="download" href="/downloads/velora-ai-extension.zip" download>↓ Velora AI’ı indir · v0.2.1</a></p><details open={!state}><summary>Eklenti kurulumu ve bağlantı bilgileri</summary><ol><li>Yukarıdaki ZIP’i indirip bir klasöre çıkartın. Bu klasörü Chrome → Uzantılar → Geliştirici modu → Paketlenmemiş öğe yükle ile yükleyin.</li><li>Mevcut kurulumunuzu güncellerken aynı eklenti klasörünü kullanın; kayıtlı ayarlar korunur. Yeni GPS/proxy ve site ayarı izinlerini Chrome’da bir kez onaylayın. Yeni klasöre kurulum farklı eklenti kimliği oluşturabilir.</li><li>Daha önce ayrı Connect eklentisini kurduysanız birleşik sürümü kullanırken onu devre dışı bırakın. Yerel geliştirme paneli ve mevcut canlı panel adresi desteklenir. Bağlantı kurulunca durum üstte görünür.</li><li>Chrome debugger bilgi çubuğu GPS açıkken normaldir. DevTools veya kullanıcı bağlantıyı keserse panelden yeniden kaydedin.</li></ol></details>{#if state?.runtime?.proxyError}<p class="error">Son proxy hatası: {state.runtime.proxyError}</p>{/if}{#each Object.entries(state?.runtime ?? {}).filter(([k, v]) => k.startsWith('gps:') && v) as [key, value]}<p class="error">Sekme {key.slice(4)}: {value}</p>{/each}</div>
