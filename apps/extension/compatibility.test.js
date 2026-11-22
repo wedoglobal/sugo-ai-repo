@@ -7,7 +7,7 @@ describe('mevcut otomasyon eklentisi uyumluluğu', () => {
     const manifest = JSON.parse(file('./manifest.json'));
     expect(manifest.permissions).toEqual(expect.arrayContaining(['storage', 'debugger', 'proxy', 'webRequestAuthProvider']));
     expect(manifest.name).toBe('Velora AI');
-    expect(manifest.version).toBe('0.2.1');
+    expect(manifest.version).toBe('0.3.13');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.content_scripts.flatMap((s) => s.js)).toEqual(['inject.js', 'content.js', 'network-bridge.js']);
     expect(file('./automation.js')).not.toContain('network.js');

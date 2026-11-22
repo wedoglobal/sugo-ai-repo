@@ -5,6 +5,8 @@ import { isGiftText, onlyGifts } from './gift.js';
 import { pickableGreetings } from './greetings.js';
 import { asksForCall, asksForPhoto, asksForVoice, createSpeechMedia, pickMedia, shouldUseCatalogVoice } from './media.js';
 import { queueNudge } from './nudge.js';
+import { recentlyRefused } from './refusal.js';
+import { matchContextRules } from './context-rules.js';
 import { removeRepetition } from './repetition.js';
 import { ROUTINE_PREFIX, routineNow } from './routine.js';
 import { isFollowNotice, isIncomingPhoto, isIncomingVoice } from './events.js';
@@ -74,13 +76,18 @@ async function cancelJob(db, job, reason) {
 
 /**
  * Extension'ın gönderdiği sohbet görüntüsünü kaydeder, gerekirse iş kuyruğa alıp cevabı üretir.
- * @param {{hostSugoId:string, peerSugoId:string, peerName?:string, voiceEnabled?:boolean, unansweredFrom?:number, messages:{dir:'in'|'out',text:string,ts?:string,diamonds?:number}[]}} input
+ * @param {{hostSugoId:string, peerSugoId:string, peerName?:string, voiceEnabled?:boolean, online?:boolean, emptyChat?:boolean, unansweredFrom?:number, messages:{dir:'in'|'out',text:string,ts?:string,diamonds?:number}[]}} input
  */
 export async function ingest(db, deps, input) {
   const host = await getHost(db, input.hostSugoId);
   if (host.active === false) return { pairId: pairId(host.sugo_id, input.peerSugoId), job: null, paused: true };
   const pair = await ensurePair(db, host, input.peerSugoId, input.peerName);
-  const state = must(await db.from('pairs').select('reply_disabled_reason').eq('id', pair).single());
+  let state = must(await db.from('pairs').select('reply_disabled_reason').eq('id', pair).single());
+  // Eklenti kadın/engel kontrolünü sohbet açıkken yaptı; sitede boş görünen sohbet eski bir "yanıt dışı" işaretiyle kilitli kalmaz.
+  if (state.reply_disabled_reason && input.emptyChat === true) {
+    must(await db.from('pairs').update({ reply_disabled_reason: null }).eq('id', pair));
+    state = { reply_disabled_reason: null };
+  }
   if (state.reply_disabled_reason) return { pairId: pair, job: null, ignored: state.reply_disabled_reason };
   must(await db.from('pairs').update({ delivery_retry_at: null }).eq('id', pair));
   if (typeof input.voiceEnabled === 'boolean') must(await db.from('pairs').update({ voice_enabled: input.voiceEnabled }).eq('id', pair));
@@ -139,6 +146,16 @@ export async function ingest(db, deps, input) {
     await cancelJob(db, job, 'cevaplanacak mesaj kalmadı');
     job = null;
   }
+  if (input.emptyChat === true && unread.length === 0 && job) {
+    // Boş sohbette hemen selam gider: dürtme iptal edilir, kilitte takılı kalan selam serbest bırakılır.
+    if (job.kind !== 'welcome') {
+      await cancelJob(db, job, 'sohbet boş: karşılama gönderilecek');
+      job = null;
+    } else if (job.status === 'processing') {
+      must(await db.from('jobs').update({ status: 'pending', locked_until: null, updated_at: new Date().toISOString() }).eq('id', job.id));
+      job = { ...job, status: 'pending' };
+    }
+  }
 
   let needsGeneration = false;
   if (unread.length > 0) {
@@ -151,11 +168,15 @@ export async function ingest(db, deps, input) {
       job = { ...job, kind: 'reply' };
       needsGeneration = true;
     }
-  } else if (total.length === 0 && !job) {
+  } else if ((total.length === 0 || input.online === true || input.emptyChat === true) && !job) {
+    // Çevrim içi partnere, hiç yazışılmamış sohbete ve sitede boş görünen eşleşmeye karşılama selamı gider.
+    // Mesajlarımızı reddeden (kırmızı ünlem) kişiye bekleme süresi dolana dek yeniden selam kuyruğa alınmaz.
+    if (await recentlyRefused(db, pair, deps.now?.() ?? new Date())) return { pairId: pair, job: null, refused: true };
     job = must(await db.from('jobs').insert({ pair_id: pair, host_id: host.id, kind: 'welcome' }).select().single());
     needsGeneration = true;
-  } else if (total.length === 0 && job?.kind === 'welcome' && job.status === 'pending' && !job.reply_text
-    && Date.now() - Date.parse(job.updated_at || job.created_at) > 180000) {
+  } else if ((total.length === 0 || input.emptyChat === true) && job?.kind === 'welcome' && job.status === 'pending' && !job.reply_text
+    && (input.emptyChat === true || Date.now() - Date.parse(job.updated_at || job.created_at) > 180000)) {
+    // Metni üretilemeden takılı kalan selam, sohbet sitede boş göründüğü sürece yeniden üretilir.
     must(await db.from('jobs').update({ error: null, updated_at: new Date().toISOString() }).eq('id', job.id));
     needsGeneration = true;
   }
@@ -247,6 +268,9 @@ export async function generate(db, deps, jobId, { rejected = '' } = {}) {
 
   const rules = must(await db.from('app_settings').select('value').eq('key', 'replacements').maybeSingle())?.value;
   const personaRules = must(await db.from('app_settings').select('value').eq('key', 'persona_rules').maybeSingle())?.value;
+  const savedContextRules = must(await db.from('app_settings').select('value').eq('key', 'context_rules').maybeSingle())?.value;
+  // Playground'da kaydedilmemiş deneme kuralları kayıtlı kurallara eklenir.
+  const contextRules = [...(Array.isArray(savedContextRules) ? savedContextRules : []), ...(deps.contextRulesDraft ?? [])];
   const routine = routineNow(host.knowledge, now, persona.timeZone);
   const mem = await memory;
   if (mem && (mem.changed.length || mem.notes.length)) {
@@ -325,7 +349,7 @@ export async function generate(db, deps, jobId, { rejected = '' } = {}) {
     : '';
   const ask = async (retryRule) => cleanReply(removeRepetition(applyReplacements(await deps.llm({
     model: host.model || deps.models.chat, temperature: 0.9, maxTokens: 150, thinkTokens: 0,
-    messages: buildReplyMessages({ kind: job.kind, persona, permanent: pair.permanent, disclosed: pair.disclosed, temp, history, unread, avoid, knowledge, now, extraRule: [mediaRule, rejectedRule, retryRule].filter(Boolean).join(' '), routine, rules: Array.isArray(personaRules) ? personaRules : [] }),
+    messages: buildReplyMessages({ kind: job.kind, persona, permanent: pair.permanent, disclosed: pair.disclosed, temp, history, unread, avoid, knowledge, now, extraRule: [mediaRule, rejectedRule, retryRule].filter(Boolean).join(' '), routine, rules: Array.isArray(personaRules) ? personaRules : [], contextRules: matchContextRules(contextRules, [...temp, ...unread]) }),
   }), rules), persona, history, unread));
 
   const produce = async () => {
@@ -368,11 +392,17 @@ export async function generate(db, deps, jobId, { rejected = '' } = {}) {
   return reply;
 }
 
-/** Sugo filtresi gönderilen metni reddetti: aynı konuda filtreye takılmayacak yedek cevabı üretip job'a yazar. */
+/** Sugo filtresi bir metni reddettiğinde yeniden metin üretilmez; filtreye takılmayacak kısa bir hitap gönderilir. */
+export const FILTER_FILLERS = ['askm', 'canım', 'ömrüm', 'tatlım', 'hayatım', 'güzelim', 'bebeğim', 'canımın içi', 'aşkım'];
+
+/** Reddedilen metnin yerine rastgele kısa bir hitap yazar (reddedilenle aynı olanı seçmez) ve job'a kaydeder. */
 export async function rejectJob(db, deps, jobId, rejectedText = '') {
   const job = must(await db.from('jobs').select('id, status').eq('id', jobId).single());
   if (job.status === 'done' || job.status === 'failed') throw new Error('job zaten kapandı');
-  return generate(db, deps, jobId, { rejected: rejectedText || ' ' });
+  const choices = FILTER_FILLERS.filter((f) => f !== String(rejectedText).trim().toLocaleLowerCase('tr'));
+  const text = choices[Math.floor((deps?.random ?? Math.random)() * choices.length)];
+  must(await db.from('jobs').update({ reply_text: text, send_text: true, error: null, updated_at: new Date().toISOString() }).eq('id', jobId));
+  return text;
 }
 
 /** Cevap gönderildi: out mesajını kaydeder, okunmamışları işlenmiş sayar, söylenen bilgileri işler. */
@@ -525,12 +555,38 @@ export async function retryJob(db, deps, jobId) {
  * Playground: sugo'ya hiçbir şey gitmeden bir gelen mesaj simüle edilir, cevap üretilir ve "gönderilmiş" sayılır.
  * @returns {{reply:string, memoryBefore:object, memoryAfter:object, temp:string[], pairId:string}}
  */
-export async function playgroundTurn(db, deps, { hostSugoId, peerSugoId, peerName = '', text }) {
+/**
+ * Gerçek bir sohbeti playground kişisine kopyalar (mesajlar, hafıza, söylenenler, geçerli geçici bağlam).
+ * Gerçek sohbete dokunulmaz; aynı koda daha önce kopyalanmış playground kişisi baştan kurulur.
+ * @returns {{hostSugoId:string, peer:string}}
+ */
+export async function importPlaygroundPair(db, sourcePairId, now = new Date()) {
+  const src = must(await db.from('pairs').select('id, host_id, peer_sugo_id, peer_name, permanent, disclosed, voice_enabled, hosts(sugo_id)').eq('id', sourcePairId).maybeSingle());
+  if (!src) throw new NotFoundError('sohbet yok');
+  const peer = `i${String(src.peer_sugo_id).replace(/\W/g, '')}`;
+  const id = pairId(src.hosts.sugo_id, `pg${peer}`);
+  must(await db.from('pairs').delete().eq('id', id));
+  must(await db.from('pairs').insert({ id, host_id: src.host_id, peer_sugo_id: `pg${peer}`, peer_name: src.peer_name, permanent: src.permanent, disclosed: src.disclosed, voice_enabled: src.voice_enabled }));
+  const messages = must(await db.from('messages').select('direction, text, sugo_ts').eq('pair_id', src.id).order('id'));
+  if (messages.length) must(await db.from('messages').insert(messages.map((m, i) => ({ pair_id: id, direction: m.direction, text: m.text, sugo_ts: m.sugo_ts ?? '', dedupe_key: `imp#${i}`, handled: true }))));
+  const temp = must(await db.from('temp_context').select('text, expires_at').eq('pair_id', src.id).gt('expires_at', now.toISOString()));
+  if (temp.length) must(await db.from('temp_context').insert(temp.map((t) => ({ pair_id: id, text: t.text, expires_at: t.expires_at }))));
+  return { hostSugoId: src.hosts.sugo_id, peer };
+}
+
+export async function playgroundTurn(db, deps, { hostSugoId, peerSugoId, peerName = '', text, context = [], draftRules = [] }) {
   const host = await getHost(db, hostSugoId);
   const pair = await ensurePair(db, host, peerSugoId, peerName);
   const before = must(await db.from('pairs').select('permanent, disclosed').eq('id', pair).single());
   const stale = await activeJob(db, pair);
   if (stale) await cancelJob(db, stale, 'playground');
+
+  const now = deps.now?.() ?? new Date();
+  const notes = context.map((c) => String(c).trim().slice(0, 500)).filter(Boolean).slice(0, 8);
+  // Denenen bağlam, gerçek sohbetteki gibi 48 saat geçerli geçici not olarak eklenir (aynı not tekrarlanmaz).
+  const known = new Set(await loadContext(db, { id: pair }, now));
+  const fresh = notes.filter((n) => !known.has(n));
+  if (fresh.length) must(await db.from('temp_context').insert(fresh.map((text) => ({ pair_id: pair, text, expires_at: new Date(now.getTime() + 48 * 3600_000).toISOString() }))));
 
   let kind = 'reply';
   if (text?.trim()) {
@@ -541,10 +597,12 @@ export async function playgroundTurn(db, deps, { hostSugoId, peerSugoId, peerNam
     kind = 'welcome';
   }
   const job = must(await db.from('jobs').insert({ pair_id: pair, host_id: host.id, kind }).select().single());
-  const res = await generateSafely(db, deps, job.id);
+  const res = await generateSafely(db, { ...deps, contextRulesDraft: draftRules }, job.id);
   if (res.job.status === 'failed') throw new Error(res.job.error);
   await completeJob(db, job.id);
   const after = must(await db.from('pairs').select('permanent, disclosed').eq('id', pair).single());
-  const temp = await loadContext(db, { id: pair }, deps.now?.() ?? new Date());
-  return { pairId: pair, reply: res.job.reply, memoryBefore: before, memoryAfter: after, temp };
+  const temp = await loadContext(db, { id: pair }, now);
+  const saved = must(await db.from('app_settings').select('value').eq('key', 'context_rules').maybeSingle())?.value;
+  const matched = matchContextRules([...(Array.isArray(saved) ? saved : []).map((r) => ({ ...r, draft: false })), ...draftRules.map((r) => ({ ...r, draft: true }))], [...temp, text ?? '']).map((r) => ({ when: r.when, draft: r.draft }));
+  return { pairId: pair, reply: res.job.reply, memoryBefore: before, memoryAfter: after, temp, matched };
 }

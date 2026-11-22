@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Velora AI",
-  "version": "0.2.1",
+  "version": "0.3.13",
   "description": "Velora AI: sohbet otomasyonu, site bazlı GPS ve IPv4 proxy yönetimi.",
   "permissions": [
     "storage",
+    "alarms",
     "debugger",
     "proxy",
     "tabs",

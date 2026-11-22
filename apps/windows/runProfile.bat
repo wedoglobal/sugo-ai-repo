@@ -3,6 +3,7 @@
 setlocal EnableDelayedExpansion
 
 set "BASE=%~dp0ChromeProfiles"
+set "EXT=%~dp0extension"
 set "CHROME=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
 
 if not exist "%CHROME%" (
@@ -11,6 +12,12 @@ if not exist "%CHROME%" (
 
 if not exist "%CHROME%" (
     echo Chrome bulunamadi!
+    pause
+    exit /b
+)
+
+if not exist "%EXT%\manifest.json" (
+    echo Eklenti klasoru bulunamadi: %EXT%
     pause
     exit /b
 )
@@ -45,6 +52,6 @@ if not exist "%PROFILE%" (
 echo.
 echo Aciliyor: profile_%PAD%
 
-start "" "%CHROME%" --user-data-dir="%PROFILE%" --no-first-run --disable-gpu --disable-gpu-compositing
+start "" "%CHROME%" --user-data-dir="%PROFILE%" --load-extension="%EXT%" --disable-features=DisableLoadExtensionCommandLineSwitch --no-first-run --disable-gpu --disable-gpu-compositing
 
 endlocal

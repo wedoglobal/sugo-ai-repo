@@ -22,7 +22,11 @@
   <div class="row">
     <div><label for="sid">Platform profil ID (/profile/&lt;id&gt;)</label><input id="sid" name="sugo_id" required /></div>
     <div><label for="nm">Ad</label><input id="nm" name="name" /></div>
+    <div><label for="cl">Referans al (isteğe bağlı)</label>
+      <select id="cl" name="clone_from"><option value="">— Boş profil —</option>{#each data.hosts as h (h.id)}<option value={h.id}>{h.name || h.sugo_id} ({h.sugo_id})</option>{/each}</select>
+    </div>
   </div>
+  <p class="muted">Referans seçersen karakter ve ses ayarları, bilgi, model ve tüm medya dosyaları birebir kopyalanır; konum/proxy kopyalanmaz. Sonra düzenleyebilirsin.</p>
   {#if form?.error}<p class="err">{form.error}</p>{/if}
   <p><button>Profili oluştur →</button></p>
 </form>

@@ -4,6 +4,7 @@
 </script>
 
 <h1>{data.pair.id} <span class="muted">({data.pair.hosts?.name} ↔ {data.pair.peer_name})</span></h1>
+{#if !data.pair.peer_sugo_id?.startsWith('pg')}<p><a class="primary-link" href="/playground?pair={encodeURIComponent(data.pair.id)}">Playground'da dene ↗</a> <span class="muted">Sohbet kopyalanır, gerçek sohbet etkilenmez.</span></p>{/if}
 
 <form method="POST" action="?/savePermanent" class="card">
   <strong>Kalıcı hafıza</strong>

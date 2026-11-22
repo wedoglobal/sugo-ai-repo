@@ -130,3 +130,115 @@ describe('gönderim anında panel kontrolü', () => {
     expect(sendMessage).toHaveBeenCalledWith({ type: 'config', fresh: true });
   });
 });
+
+describe('boşta insansı hareketler', () => {
+  const setup = () => {
+    const events = [];
+    const target = { dispatchEvent: (e) => events.push(e.type), scrollBy: () => {}, scrollHeight: 100, clientHeight: 100 };
+    const Ev = class { constructor(type) { this.type = type; } };
+    const context = createContext({
+      console, window: {}, setTimeout: (fn) => { fn(); }, innerWidth: 1000, innerHeight: 700, MouseEvent: Ev, PointerEvent: Ev, WheelEvent: Ev,
+      document: { elementFromPoint: () => target, body: target, scrollingElement: null },
+      getComputedStyle: () => ({ overflowY: 'visible' }),
+      chrome: { runtime: { onMessage: { addListener() {} } } },
+    });
+    runInContext(script, context);
+    return { events, context };
+  };
+  it('fare hareketi pointermove ve mousemove olaylarını arka arkaya üretir', async () => {
+    const { events, context } = setup();
+    await runInContext('wanderMouse()', context);
+    expect(events.filter((t) => t === 'pointermove').length).toBeGreaterThanOrEqual(10);
+    expect(events.filter((t) => t === 'mousemove').length).toBe(events.filter((t) => t === 'pointermove').length);
+  });
+  it('zamanı gelmeden hareket etmez, gelince bir sonraki hareketi öteler', async () => {
+    const { events, context } = setup();
+    expect(runInContext('humanDue(10, 20)', context)).toBe(false);
+    expect(runInContext('humanDue(20, 20)', context)).toBe(true);
+    runInContext('nextHumanAt = Date.now() + 60000', context);
+    await runInContext('humanIdle({})', context);
+    expect(events).toEqual([]);
+  });
+});
+
+describe('Mesajlar sayfasında kalma', () => {
+  const setup = (stored) => {
+    const store = { ...stored };
+    const sendMessage = vi.fn(async (m) => (m.type === 'rest-start' ? { ok: true } : { enabled: true, hostSugoId: 'h' }));
+    const reload = vi.fn();
+    const context = createContext({
+      console, window: {}, document: { querySelectorAll: () => [] }, setTimeout: (fn) => { fn(); }, location: { reload, pathname: '/' },
+      chrome: {
+        runtime: { onMessage: { addListener() {} }, sendMessage, getManifest: () => ({ version: 't' }) },
+        storage: { local: {
+          get: async (k) => ({ [k]: store[k] }),
+          set: async (o) => { Object.assign(store, o); },
+          remove: async (k) => { delete store[k]; },
+        } },
+      },
+    });
+    runInContext(script, context);
+    runInContext('goTo = async () => {}; scriptStartedAt = 0;', context);
+    return { store, sendMessage, reload, context };
+  };
+  const cfg = "{ hostSugoId: 'h' }";
+  it('mesaj gidince boşta sayacı sıfırlanır', async () => {
+    const { store, context } = setup({ 'sugo-last-sent:h': Date.now() - 11 * 60000 });
+    await runInContext(`noteSent(${cfg})`, context);
+    expect(Date.now() - store['sugo-last-sent:h']).toBeLessThan(5000);
+  });
+  it('ana sayfada takılı kalınca Mesajlar bağlantısına geçer; Mesajlar sayfasındaysa dokunmaz', async () => {
+    const { context } = setup({});
+    runInContext("globalThis.__nav = []; goTo = async (s, path) => { globalThis.__nav.push(path); }; scriptStartedAt = 0; nextBackTryAt = 0;", context);
+    context.chrome.runtime.sendMessage = async () => ({ enabled: true, hostSugoId: 'h', apiKey: 'k' });
+    expect(await runInContext('backToMessages()', context)).toBe(true);
+    expect(runInContext('globalThis.__nav', context)).toEqual(['/messages']);
+    expect(await runInContext('backToMessages()', context)).toBe(false);
+  });
+  it('Mesajlar açılamazsa Ana sayfa tam yüklenir, birkaç dakika bekleyip yine bağlantıyla geçer; /messages hiçbir zaman yüklenmez', async () => {
+    const { store, reload, context } = setup({});
+    const assign = vi.fn();
+    context.location.assign = assign;
+    context.location.pathname = '/';
+    runInContext("goTo = async () => { throw new Error('yok'); }; scriptStartedAt = 0;", context);
+    context.chrome.runtime.sendMessage = async () => ({ enabled: true, hostSugoId: 'h', apiKey: 'k' });
+    for (let i = 0; i < 3; i++) {
+      runInContext('nextBackTryAt = 0', context);
+      await runInContext('backToMessages()', context);
+    }
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(assign).not.toHaveBeenCalledWith('/messages');
+    expect(store['sugo-back-after:h'] - Date.now()).toBeGreaterThan(110000);
+    runInContext('nextBackTryAt = 0; globalThis.__n = 0; goTo = async () => { globalThis.__n++; }', context);
+    expect(await runInContext('backToMessages()', context)).toBe(false);
+    expect(runInContext('globalThis.__n', context)).toBe(0);
+    store['sugo-back-after:h'] = Date.now() - 1;
+    expect(await runInContext('backToMessages()', context)).toBe(true);
+  });
+});
+
+
+describe('eşleşme satırı sırası', () => {
+  const matchRow = (id, unread) => ({
+    id, innerText: `eşleşme ${id}`,
+    getAttribute: () => id,
+    querySelector: (sel) => (sel === '.conv-item-unread' ? (unread ? {} : null) : sel.includes('match-prefix') ? {} : null),
+  });
+  const pick = (rows) => {
+    const context = createContext({
+      rows, console: { info() {}, warn() {} }, setTimeout, clearTimeout,
+      document: { querySelectorAll: () => rows },
+      chrome: { storage: { local: { async get() { return {}; }, async set() {}, async remove() {} } }, runtime: { onMessage: { addListener() {} } } },
+    });
+    runInContext(script, context);
+    return runInContext('nextMatchRow(rows)', context)?.id;
+  };
+
+  it('okunmamış eşleşme, üstteki okunmuş eşleşmelerden önce açılır', () => {
+    expect(pick([matchRow('1', false), matchRow('2', false), matchRow('3', true)])).toBe('3');
+  });
+
+  it('okunmamış yoksa listenin başındaki eşleşme açılır', () => {
+    expect(pick([matchRow('1', false), matchRow('2', false)])).toBe('1');
+  });
+});

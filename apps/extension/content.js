@@ -1,5 +1,5 @@
 // sugo.live /messages: okunmamış sohbetleri dashboard'a iletir, kuyruktaki cevapları yazıp gönderir.
-const POLL_MS = 700;
+const POLL_MS = 400;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const call = (m) => chrome.runtime.sendMessage({ type: 'api', ...m });
 const getConfig = (fresh = false) => chrome.runtime.sendMessage({ type: 'config', ...(fresh ? { fresh: true } : {}) });
@@ -64,7 +64,7 @@ async function openChat(row) {
     return pane?.querySelector('[data-testid=private-chat-content]') ? pane : null;
   });
   if (dialog) {
-    await waitFor(() => dialog.querySelector(`${SEL.message}, ${SEL.gift}, ${SEL.image}, ${SEL.voice}, ${SEL.userCard}`), 1500);
+    await waitFor(() => dialog.querySelector(`${SEL.message}, ${SEL.gift}, ${SEL.image}, ${SEL.voice}, ${SEL.userCard}`), 3000);
     await sleep(250);
   }
   return dialog;
@@ -120,8 +120,8 @@ function isFollowNotice(text) {
     .includes(String(text).toLocaleLowerCase('tr').replace(/[^\p{L}\p{N}]/gu, ''));
 }
 const isOnlineNotice = (text) => /partner\s+çevrim\s*içi|çevrim\s*içi\s+oldu|\[çevrim\s*içi\]/iu.test(text);
-async function getNextJob(cfg, replyOnly = false) {
-  const visiblePeerIds = conversationRows()
+async function getNextJob(cfg, replyOnly = false, only = null) {
+  const visiblePeerIds = only ?? conversationRows()
     .map((row) => row.getAttribute('data-message-conversation-id')).filter((id) => id && !skipped.has(id));
   return checkedCall({ path: '/api/ext/jobs/next', method: 'POST', body: { host: cfg.hostSugoId, replyOnly, visiblePeerIds } });
 }
@@ -133,15 +133,17 @@ function ignoredReason(dialog) {
   const incoming = messages.filter((m) => m.dir === 'in');
   const tail = messages.slice(messages.map((m) => m.dir).lastIndexOf('out') + 1).filter((m) => m.dir === 'in');
   if ((tail.length && tail.every((m) => isFollowNotice(m.text))) || (incoming.length && incoming.every((m) => isFollowNotice(m.text)))) return 'follow';
-  if (!tail.length) {
-    const events = [...dialog.querySelectorAll(`${SEL.message}, ${SEL.image}, ${SEL.voice}, ${SEL.gift}, ${SEL.system}`)];
-    if (isOnlineNotice(events.at(-1)?.innerText ?? '')) return 'activity';
-  }
   return null;
+}
+/** Sohbetin son olayı "partner çevrim içi" bildirimiyse karşılama selamı için sunucuya işaretlenir. */
+function endsWithOnlineNotice(dialog) {
+  const events = [...dialog.querySelectorAll(`${SEL.message}, ${SEL.image}, ${SEL.voice}, ${SEL.gift}, ${SEL.system}`)];
+  return isOnlineNotice(events.at(-1)?.innerText ?? '');
 }
 async function skipConversation(cfg, peerId, dialog) {
   const reason = ignoredReason(dialog);
-  if (!reason) return false;
+  // "Seni takip ettim" bildirimi yanıtsız bırakılmaz: sohbete düz karşılama mesajı gider.
+  if (!reason || reason === 'follow') return false;
   const result = await checkedCall({ path: '/api/ext/ignore', method: 'POST', body: { hostSugoId: cfg.hostSugoId, peerSugoId: peerId, reason } });
   if (!result.ignored) return false;
   if (reason === 'female' || reason === 'blocked') skipped.add(String(peerId));
@@ -381,6 +383,7 @@ async function syncArrivals(cfg, job, dialog, flush = true) {
 }
 
 async function runJob(cfg, job, opened = null) {
+  setState(job.kind === 'welcome' ? 'karşılama gönderiyor' : 'cevap gönderiyor', String(job.peerSugoId));
   let completed = false;
   let dialog = null;
   try {
@@ -410,6 +413,8 @@ async function runJob(cfg, job, opened = null) {
     await syncArrivals(cfg, job, dialog, false);
     await checkedCall({ path: `/api/ext/jobs/${job.id}/complete`, method: 'POST' });
     completed = true;
+    lastActivityAt = Date.now();
+    await noteSent(cfg);
     const more = await syncArrivals(cfg, job, dialog);
     if (!more) await clearPending(cfg, job.peerSugoId);
     if (job.kind === 'welcome') {
@@ -437,7 +442,9 @@ const skipped = new Set();
 /**
  * Normal mesajlar en eskiden başlayarak seçilir; eşleşmeler ancak normal mesaj işi kalmayınca açılır.
  */
-const GREET_RETRY_MS = 3 * 60 * 1000;
+// Boş veya cevapsız eşleşme satırları bu süre geçmeden yeniden açılmaz.
+const GREET_RETRY_MS = 30 * 60 * 1000;
+const MATCH_RETRY_MS = 30 * 60 * 1000;
 const MATCH_EVERY_REPLIES = 1;
 const MATCH_MIN_GAP_MS = 5000;
 const greeted = new Map();
@@ -481,14 +488,49 @@ function hasPendingNormal(rows) {
     return !!r.querySelector(SEL.unread) && !(h && h.sig === rowSignature(r) && Date.now() - h.at < HANDLED_RETRY_MS);
   });
 }
+// Okunmamış rozetli eşleşme satırı, okunmuş eski eşleşmelerin önünde ve daha kısa bekleme ile açılır.
+const UNREAD_MATCH_RETRY_MS = 5 * 60 * 1000;
 function nextMatchRow(rows = conversationRows()) {
-  return rows.find((r) => {
+  const now = Date.now();
+  const open = (r) => {
     const id = r.getAttribute('data-message-conversation-id');
-    const h = handled.get(id);
-    return !skipped.has(id) && isMatchRow(r) && Date.now() >= (pendingRows.get(id) ?? 0)
-      && !(h && h.sig === rowSignature(r) && Date.now() - h.at < HANDLED_RETRY_MS)
-      && Date.now() - (greeted.get(id) ?? 0) > GREET_RETRY_MS;
-  }) ?? null;
+    return !skipped.has(id) && isMatchRow(r) && now >= (pendingRows.get(id) ?? 0);
+  };
+  const recent = (r, ms) => {
+    const h = handled.get(r.getAttribute('data-message-conversation-id'));
+    return !!h && h.sig === rowSignature(r) && now - h.at < ms;
+  };
+  const unread = rows.filter((r) => open(r) && r.querySelector(SEL.unread) && !recent(r, UNREAD_MATCH_RETRY_MS)).pop();
+  if (unread) return unread;
+  return rows.find((r) => open(r) && !recent(r, MATCH_RETRY_MS)
+    && now - (greeted.get(r.getAttribute('data-message-conversation-id')) ?? 0) > GREET_RETRY_MS) ?? null;
+}
+const LOAD_MORE_GAP_MS = 2 * 60 * 1000;
+let lastLoadMoreAt = 0;
+function listScroller() {
+  for (let el = conversationRows()[0]?.parentElement; el; el = el.parentElement) {
+    if (el.scrollHeight > el.clientHeight + 40 && /auto|scroll/.test(getComputedStyle(el).overflowY)) return el;
+  }
+  return null;
+}
+/** Sohbet listesini en alta kaydırıp tembel yüklenen satırları DOM'a getirir, sonra başa döner. */
+async function loadMoreRows(force = false) {
+  if (!force && Date.now() - lastLoadMoreAt < LOAD_MORE_GAP_MS) return false;
+  lastLoadMoreAt = Date.now();
+  const area = listScroller();
+  if (!area) return false;
+  const before = conversationRows().length;
+  for (let i = 0; i < 6; i++) {
+    const count = conversationRows().length;
+    area.scrollTo({ top: area.scrollHeight });
+    await sleep(700);
+    if (conversationRows().length === count && i > 0) break;
+  }
+  area.scrollTo({ top: 0 });
+  await sleep(300);
+  const after = conversationRows().length;
+  if (after > before) console.info('[sugo-host] liste kaydırıldı:', { önce: before, sonra: after });
+  return after > before;
 }
 function nextRow({ matches = true, online = false } = {}) {
   const rows = conversationRows();
@@ -513,7 +555,7 @@ function logIdle() {
   const rows = conversationRows();
   const unread = rows.filter((r) => r.querySelector(SEL.unread));
   const id = (r) => r.getAttribute('data-message-conversation-id');
-  console.info('[sugo-host] boşta:', { adres: location.pathname, satır: rows.length, okunmamış: unread.length, okunmamışAtlanan: unread.filter((r) => skipped.has(id(r))).length, okunmamışBeklemede: unread.filter((r) => handled.has(id(r))).length, bildirimlerSatırı: !!document.querySelector('.conv-header-row') });
+  console.info('[sugo-host] boşta:', { adres: location.pathname, satır: rows.length, okunmamış: unread.length, okunmamışAtlanan: unread.filter((r) => skipped.has(id(r))).length, okunmamışBeklemede: unread.filter((r) => handled.has(id(r))).length, bildirimlerSatırı: !!document.querySelector('.conv-header-row'), sessizlikSn: Math.round((Date.now() - lastActivityAt) / 1000) });
 }
 
 async function ingestUnread(cfg, row = nextRow()) {
@@ -522,9 +564,11 @@ async function ingestUnread(cfg, row = nextRow()) {
     return false;
   }
   const peerSugoId = row.getAttribute('data-message-conversation-id');
+  setState('sohbet okuyor', String(peerSugoId));
   await rememberPending(cfg, peerSugoId, Date.now() + 15000);
   const peerName = row.querySelector(SEL.name)?.innerText.trim() ?? '';
   let failedJob = false;
+  let emptyAttempt = false;
   try {
     const dialog = await openChat(row);
     if (!dialog) throw new Error('sohbet penceresi açılmadı');
@@ -538,13 +582,20 @@ async function ingestUnread(cfg, row = nextRow()) {
       await checkedCall({ path: '/api/ext/ingest', method: 'POST', body: saved });
       await chrome.storage.local.remove(key);
     }
-    const messages = parseMessages(dialog);
-    if (!messages.length && (!isMatchRow(row) || !dialog.querySelector(SEL.userCard))) {
+    let messages = parseMessages(dialog);
+    // Mesajlar geç yükleniyor olabilir; boş sayıp yinelenen selam atmamak için bir kez daha bakılır.
+    if (!messages.length) {
+      await sleep(2500);
+      messages = parseMessages(dialog);
+    }
+    emptyAttempt = !messages.length;
+    const followOnly = ignoredReason(dialog) === 'follow';
+    if (!messages.length && !dialog.querySelector(`${SEL.userCard}, ${SEL.system}`)) {
       throw new Error('sohbet açıldı ama okunabilir mesaj yüklenmedi');
     }
-    const body = { hostSugoId: cfg.hostSugoId, peerSugoId, peerName, voiceEnabled: voiceEnabled(), messages };
+    const body = { hostSugoId: cfg.hostSugoId, peerSugoId, peerName, voiceEnabled: voiceEnabled(), messages, ...(isOnlineRow(row) || endsWithOnlineNotice(dialog) ? { online: true } : {}), ...(!messages.length || followOnly ? { emptyChat: true } : {}) };
     let res = await call({ path: '/api/ext/ingest', method: 'POST', body });
-    if (res?.ok && !res.data?.job && messages.at(-1)?.dir === 'in') {
+    if (res?.ok && !res.data?.job && messages.at(-1)?.dir === 'in' && !followOnly) {
       // DOM'da son söz karşı taraftaysa eski "işlendi" kaydı yüzünden cevapsız bırakma.
       const unansweredFrom = messages.map((m) => m.dir).lastIndexOf('out') + 1;
       res = await call({ path: '/api/ext/ingest', method: 'POST', body: { ...body, unansweredFrom } });
@@ -555,16 +606,18 @@ async function ingestUnread(cfg, row = nextRow()) {
       throw new Error(res.data.job.error || 'cevap üretimi başarısız');
     }
     console.info('[sugo-host] sohbet okundu, sunucuya gönderildi:', peerSugoId, `${messages.length} mesaj`);
+    if (res.data?.job) lastActivityAt = Date.now();
     // Ingest cevabı hazırlamayı bekler; hazır işi aynı sohbet açıkken kilitleyip gönder.
     if (res?.ok && res.data?.job?.status === 'pending') {
-      const next = await getNextJob(cfg, res.data.job.kind !== 'welcome' && messages.length > 0);
+      // Boş sohbette yalnız bu sohbetin selamı alınır; böylece başka sohbetin işi araya girmez ve selam açık sohbette gider.
+      const next = body.emptyChat ? await getNextJob(cfg, false, [peerSugoId]) : await getNextJob(cfg, res.data.job.kind !== 'welcome' && messages.length > 0);
       if (next.job) {
         await runJob(cfg, next.job, { peerSugoId, dialog });
         return true;
       }
-      await rememberPending(cfg, peerSugoId, Date.now() + 3000);
+      await rememberPending(cfg, peerSugoId, Date.now() + (messages.length ? 3000 : 20000));
     } else if (!res.data?.job) {
-      if (messages.at(-1)?.dir === 'in') throw new Error('gelen mesaj var ama sunucu cevap işi oluşturmadı');
+      if (messages.at(-1)?.dir === 'in' && !followOnly) throw new Error('gelen mesaj var ama sunucu cevap işi oluşturmadı');
       await clearPending(cfg, peerSugoId);
       handled.set(peerSugoId, { sig: rowSignature(row), at: Date.now() });
       if (!messages.length) greeted.set(peerSugoId, Date.now());
@@ -573,7 +626,8 @@ async function ingestUnread(cfg, row = nextRow()) {
     return true;
   } catch (e) {
     console.warn('[sugo-host] sohbet cevaplanamadı:', peerSugoId, e.message);
-    await rememberPending(cfg, peerSugoId, Date.now() + 15000);
+    // Boş eşleşmede hata tekrarlanırsa sohbet saniyeler içinde yeniden açılıp durmasın.
+    await rememberPending(cfg, peerSugoId, Date.now() + (failedJob ? 60000 : emptyAttempt ? 30000 : 15000));
     if (!failedJob) {
       try {
         await checkedCall({ path: '/api/ext/errors', method: 'POST', body: { hostSugoId: cfg.hostSugoId, peerSugoId, error: e.message } });
@@ -582,6 +636,112 @@ async function ingestUnread(cfg, row = nextRow()) {
     await leaveChat();
     return false;
   }
+}
+
+const HI = { homeLink: 'a[href="/"]', messagesLink: 'a[href="/messages"]' };
+let lastActivityAt = Date.now();
+
+/** Site içi bağlantıya tıklayıp rota değişmesini bekler (sayfa yenilenmez, betik yaşamaya devam eder). */
+async function goTo(selector, path) {
+  const link = await waitFor(() => document.querySelector(selector), 3000);
+  if (!link) throw new Error(`gezinme bağlantısı bulunamadı: ${path}`);
+  humanClick(link);
+  if (!(await waitFor(() => location.pathname === path, 5000))) throw new Error(`sayfa açılmadı: ${path}`);
+  await sleep(rand(800, 1500));
+}
+
+// Boştayken hesabın aktif görünmesi için rastgele insansı hareketler: fare gezintisi ve kaydırma.
+// Sayfa değiştirmez, sohbet açmaz, mesaj göndermez; yalnız Mesajlar'da kalır.
+const HUMAN_GAP_MS = [25000, 90000];
+let nextHumanAt = Date.now() + rand(...HUMAN_GAP_MS);
+let pointerAt = { x: rand(200, 800), y: rand(150, 500) };
+const humanDue = (now, nextAt) => now >= nextAt;
+
+function pointerEvent(type, x, y) {
+  const target = document.elementFromPoint(x, y) ?? document.body;
+  const init = { bubbles: true, cancelable: true, composed: true, view: window, clientX: x, clientY: y, pointerId: 1, pointerType: 'mouse', isPrimary: true };
+  target.dispatchEvent(new (type.startsWith('pointer') ? PointerEvent : MouseEvent)(type, init));
+}
+
+/** Fareyi mevcut konumdan rastgele bir noktaya eğri bir yolla götürür. */
+async function wanderMouse() {
+  const to = { x: rand(60, Math.max(120, innerWidth - 60)), y: rand(60, Math.max(120, innerHeight - 60)) };
+  const bend = { x: rand(-120, 120), y: rand(-120, 120) };
+  const steps = Math.round(rand(10, 28));
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const ease = t * t * (3 - 2 * t);
+    const x = pointerAt.x + (to.x - pointerAt.x) * ease + Math.sin(Math.PI * t) * bend.x;
+    const y = pointerAt.y + (to.y - pointerAt.y) * ease + Math.sin(Math.PI * t) * bend.y;
+    const cx = Math.min(innerWidth - 1, Math.max(0, x));
+    const cy = Math.min(innerHeight - 1, Math.max(0, y));
+    pointerEvent('pointermove', cx, cy);
+    pointerEvent('mousemove', cx, cy);
+    await sleep(rand(8, 28));
+  }
+  pointerAt = to;
+}
+
+function scrollableAt(x, y) {
+  for (let el = document.elementFromPoint(x, y); el; el = el.parentElement) {
+    if (el.scrollHeight > el.clientHeight + 40 && /auto|scroll/.test(getComputedStyle(el).overflowY)) return el;
+  }
+  return document.scrollingElement;
+}
+
+/** İmlecin altındaki kaydırılabilir alanı aşağı, sonra kısmen yukarı kaydırır. */
+async function wanderScroll() {
+  const area = scrollableAt(pointerAt.x, pointerAt.y);
+  if (!area) return;
+  const down = Math.round(rand(120, 520));
+  for (const delta of [down, -Math.round(down * rand(0.3, 1))]) {
+    const steps = Math.round(rand(5, 12));
+    for (let i = 0; i < steps; i++) {
+      const part = delta / steps;
+      area.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, composed: true, view: window, deltaY: part, clientX: pointerAt.x, clientY: pointerAt.y }));
+      area.scrollBy({ top: part });
+      await sleep(rand(30, 90));
+    }
+    await sleep(rand(400, 1600));
+  }
+}
+
+async function humanIdle() {
+  if (!humanDue(Date.now(), nextHumanAt)) return false;
+  nextHumanAt = Date.now() + rand(...HUMAN_GAP_MS);
+  await wanderMouse();
+  if (Math.random() < 0.6) await wanderScroll();
+  return false;
+}
+
+
+// Panelde "canlı durum" için eklentinin ne yaptığı 30 saniyede bir (ve önemli anlarda) sunucuya bildirilir.
+let uiState = { state: 'başlıyor', detail: '', since: Date.now() };
+let lastBeat = 0;
+let beatCfg = null;
+function setState(state, detail = '') {
+  if (uiState.state === state && uiState.detail === detail) return;
+  const changed = uiState.state !== state;
+  uiState = { state, detail, since: changed ? Date.now() : uiState.since };
+  // Durum değişince panel 30 sn'lik aralığı beklemesin (en çok 3 sn'de bir bildirilir).
+  if (changed && beatCfg && Date.now() - lastBeat > 3000) heartbeat(beatCfg, true).catch(() => {});
+}
+async function heartbeat(cfg, force = false) {
+  beatCfg = cfg;
+  if (!force && Date.now() - lastBeat < 30000) return;
+  lastBeat = Date.now();
+  let version = '';
+  try { version = chrome.runtime.getManifest().version; } catch {}
+  const lastSentAt = Number((await chrome.storage.local.get(lastSentKey(cfg)))[lastSentKey(cfg)]) || 0;
+  call({ path: '/api/ext/state', method: 'POST', body: { hostSugoId: cfg.hostSugoId, ...uiState, lastSentAt, lastActivityAt, version } });
+}
+
+let scriptStartedAt = Date.now();
+const lastSentKey = (cfg) => `sugo-last-sent:${cfg.hostSugoId}`;
+
+/** Mesaj gönderilince boşta sayacı sıfırlanır. */
+async function noteSent(cfg) {
+  await chrome.storage.local.set({ [lastSentKey(cfg)]: Date.now() });
 }
 
 let busy = false;
@@ -616,13 +776,43 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   return true;
 });
 /** İş yaptıysa true döner; döngü bu durumda beklemeden sıradakine geçer. */
+// Sayfa Mesajlar dışında takılı kaldıysa (dinlenme/yenileme sonrası ana sayfada beklemek gibi) Mesajlar'a geçilir.
+let nextBackTryAt = 0;
+let backTries = 0;
+async function backToMessages() {
+  if (Date.now() - scriptStartedAt < 8000 || Date.now() < nextBackTryAt) return false;
+  const cfg = await getConfig();
+  if (!cfg?.enabled || !cfg.hostSugoId || !cfg.apiKey) return false;
+  const waitKey = `sugo-back-after:${cfg.hostSugoId}`;
+  if (Date.now() < (Number((await chrome.storage.local.get(waitKey))[waitKey]) || 0)) return false;
+  nextBackTryAt = Date.now() + rand(8000, 15000);
+  setState('mesajlara geçiyor', `sayfa: ${location.pathname}`);
+  await heartbeat(cfg, true);
+  try {
+    await goTo(HI.messagesLink, '/messages');
+    backTries = 0;
+    return true;
+  } catch (e) {
+    console.warn('[sugo-host] Mesajlar sayfasına geçilemedi:', e.message);
+    // Bağlantı hiç gelmediyse üçüncü denemeden sonra Ana sayfa (/) tam yüklenir; Mesajlar'a birkaç dakika sonra yine bağlantıya tıklanarak geçilir.
+    if (++backTries >= 3) {
+      backTries = 0;
+      await chrome.storage.local.set({ [waitKey]: Date.now() + rand(2, 4) * 60000 });
+      if (location.pathname === '/') location.reload(); else location.assign('/');
+    }
+    return false;
+  }
+}
+
 async function tick() {
-  if (busy || !location.pathname.startsWith('/messages')) return false;
+  if (busy) return false;
+  if (!location.pathname.startsWith('/messages')) return await backToMessages();
   busy = true;
   try {
     const cfg = await getConfig();
     if (!cfg.enabled || !cfg.hostSugoId || !cfg.apiKey) return false;
     await loadPending(cfg);
+    await heartbeat(cfg);
     // Sürekli normal trafik varken de her cevaptan sonra (en erken 5 sn arayla) bir eşleşme açılır.
     if (normalRepliesSinceRepair >= MATCH_EVERY_REPLIES && Date.now() - lastMatchRepairAt >= MATCH_MIN_GAP_MS) {
       const repair = nextMatchRow();
@@ -643,8 +833,13 @@ async function tick() {
     const match = nextRow();
     if (match) return await ingestUnread(cfg, match);
     const online = nextRow({ matches: false, online: true });
-    return online ? await ingestUnread(cfg, online) : false;
+    if (online) return await ingestUnread(cfg, online);
+    // Boştayken Ana sayfa/Yakınlarda gezintisi, hi gönderme ve sayfa değiştirme yapılmaz; yalnız Mesajlar'da beklenir.
+    if (await loadMoreRows()) return true;
+    setState('boşta', 'yeni mesaj/eşleşme bekleniyor');
+    return await humanIdle();
   } catch (e) {
+    if (/Extension context invalidated/i.test(e?.message ?? '')) { staleContext(); return false; }
     console.warn('[sugo-host]', e);
     return false;
   } finally {
@@ -652,8 +847,20 @@ async function tick() {
   }
 }
 
+/** Eklenti güncellenince eski content script bağlamını yitirir; döngüyü durdurup sayfayı yeniler, yenisi devralır. */
+let stale = false;
+function staleContext() {
+  if (stale) return;
+  stale = true;
+  console.info('[sugo-host] eklenti güncellendi, sayfa yenileniyor');
+  // Mesajlar rotasında tam yenileme yapılmaz: önce Ana sayfaya geçilir, yenileme orada olur.
+  const home = location.pathname.startsWith('/messages') ? document.querySelector(HI.homeLink) : null;
+  if (home) home.click();
+  setTimeout(() => { if (!location.pathname.startsWith('/messages')) location.reload(); }, home ? 4000 : 1500);
+}
+
 (async function loop() {
-  for (;;) {
+  while (!stale) {
     const worked = await tick();
     if (!worked) await sleep(POLL_MS);
   }

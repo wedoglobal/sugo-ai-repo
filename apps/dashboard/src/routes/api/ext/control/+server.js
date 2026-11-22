@@ -1,5 +1,20 @@
 import { json } from '@sveltejs/kit';
 import { db, must } from '$lib/server/deps.js';
+
+const lastVersion = new Map();
+
+/** Profilin eklenti sürümü değiştiğinde app_settings.ext_versions geçmişine ekler; sürüm başına eşleşme karşılaştırması buna dayanır. */
+async function recordVersion(hostId, version) {
+  if (lastVersion.get(hostId) === version) return;
+  const row = must(await db().from('app_settings').select('value').eq('key', 'ext_versions').maybeSingle());
+  const log = row?.value ?? {};
+  const list = log[hostId] ?? [];
+  if (list.at(-1)?.v !== version) {
+    log[hostId] = [...list, { v: version, at: new Date().toISOString() }].slice(-100);
+    must(await db().from('app_settings').upsert({ key: 'ext_versions', value: log, updated_at: new Date().toISOString() }));
+  }
+  lastVersion.set(hostId, version);
+}
 export async function GET({ url }) {
   const id = url.searchParams.get('host');
   if (!/^\d{1,30}$/.test(id ?? '')) return json({ error: 'Geçerli profil ID gerekli' }, { status: 400 });
@@ -10,5 +25,10 @@ export async function GET({ url }) {
     const stale = new Date(Date.now() - 15000).toISOString();
     await db().from('hosts').update({ last_seen_at: new Date().toISOString() }).eq('id', host.id).or(`last_seen_at.is.null,last_seen_at.lt.${stale}`);
   } catch {}
-  return json({ host: { id: host.id, sugoId: host.sugo_id, name: host.name, active: host.active, revision: host.updated_at, network: host.network_profiles ?? [] } }, { headers: { 'cache-control': 'no-store' } });
+  const version = url.searchParams.get('v') ?? '';
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,4}$/.test(version)) await recordVersion(host.id, version).catch(() => {});
+  // Dinlenen eklenti panelden "şimdi başlat" komutunu yalnız `cmd=1` ile sorar.
+  let command = null;
+  if (url.searchParams.get('cmd') === '1') command = must(await db().from('app_settings').select('value').eq('key', `ext_cmd:${id}`).maybeSingle())?.value ?? null;
+  return json({ command, host: { id: host.id, sugoId: host.sugo_id, name: host.name, active: host.active, revision: host.updated_at, network: host.network_profiles ?? [] } }, { headers: { 'cache-control': 'no-store' } });
 }

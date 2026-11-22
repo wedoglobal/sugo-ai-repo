@@ -14,7 +14,7 @@ describe('fotoğrafla dürtme', () => {
         select() { return query; },
         eq(key, val) { filters[key] = val; return query; },
         in() { return query; }, neq() { return query; }, gt() { return query; }, lt() { return query; },
-        limit() { return query; }, order() { return query; }, is() { return query; }, single() { return query; },
+        limit() { return query; }, order() { return query; }, is() { return query; }, like() { return query; }, single() { return query; },
         update(val) { action = 'update'; value = val; return query; },
         insert(val) { action = 'insert'; value = val; return query; },
         then(resolve, reject) {

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { completeJob, ingest, nextJob, playgroundTurn, rejectJob, relevantKnowledge } from './pipeline.js';
+import { FILTER_FILLERS, completeJob, ingest, nextJob, playgroundTurn, rejectJob, relevantKnowledge } from './pipeline.js';
 
 function loadEnv() {
   try {
@@ -64,6 +64,42 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
     expect(await nextJob(db, HOST)).toBeNull();
   });
 
+  it('sitede boş görünen sohbete, kayıtta eski selam, yanıt dışı işareti veya takılı iş olsa da hemen selam hazırlanır', async () => {
+    const p = `e${Date.now()}`;
+    const first = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, messages: [] });
+    await completeJob(db, (await nextJob(db, HOST)).id);
+    await db.from('pairs').update({ reply_disabled_reason: 'female' }).eq('id', first.pairId);
+    const again = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, emptyChat: true, messages: [] });
+    expect(again.job).toMatchObject({ kind: 'welcome', status: 'pending' });
+    const claimed = await nextJob(db, HOST, undefined, { visiblePeerIds: [p] });
+    expect(claimed).toMatchObject({ kind: 'welcome', peerSugoId: p });
+    // İş kilitte takılıysa (processing) bir sonraki açılışta serbest kalır ve yine bu sohbete verilir.
+    const retry = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, emptyChat: true, messages: [] });
+    expect(retry.job).toMatchObject({ kind: 'welcome', status: 'pending' });
+    expect(await nextJob(db, HOST, undefined, { visiblePeerIds: [p] })).toMatchObject({ id: claimed.id });
+  });
+
+  it('metni üretilemeden takılı kalan selam, sitede boş görünen sohbette yeniden üretilir', async () => {
+    const p = `s${Date.now()}`;
+    const first = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, messages: [] });
+    await completeJob(db, (await nextJob(db, HOST)).id);
+    const { data: pair } = await db.from('pairs').select('host_id').eq('id', first.pairId).single();
+    const old = new Date(Date.now() - 30 * 60000).toISOString();
+    await db.from('jobs').update({ created_at: old }).eq('pair_id', first.pairId);
+    await db.from('jobs').insert({ pair_id: first.pairId, host_id: pair.host_id, kind: 'welcome', status: 'pending', updated_at: new Date(Date.now() - 120000).toISOString() });
+    const r = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, emptyChat: true, messages: [] });
+    expect(r.job).toMatchObject({ kind: 'welcome', status: 'pending' });
+    expect(r.job.reply).toBeTruthy();
+  });
+
+  it('yalnız "seni takip ettim" bildirimi olan sohbete düz karşılama gider', async () => {
+    const p = `f${Date.now()}`;
+    const notice = { dir: 'in', text: 'seni takip ettim Birbirimizi takip ettikten sonra arkadaş olabiliriz.' };
+    const r = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, emptyChat: true, messages: [notice] });
+    expect(r.job).toMatchObject({ kind: 'welcome', status: 'pending' });
+    expect((await nextJob(db, HOST))).toMatchObject({ kind: 'welcome', peerSugoId: p });
+  });
+
   it('eşleşme sohbeti (boş snapshot, yalnız sistem mesajı) persona selamıyla açılır', async () => {
     const p = `m${Date.now()}`;
     const r = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, messages: [] });
@@ -112,16 +148,14 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
     expect(await run({ permanent: {}, temp: [] })).toHaveLength(1);
   });
 
-  it('filtreye takılan mesaj için konuya uygun yedek cevap üretir ve onu tamamlar', async () => {
+  it('filtreye takılan mesaj için konuya uygun kısa hitapla değiştirir ve onu tamamlar', async () => {
     const p = `r${Date.now()}`;
     await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, messages: [{ dir: 'in', text: 'görüşelim mi', ts: '1' }] });
     const job = await nextJob(db, HOST);
     const before = calls.length;
     const text = await rejectJob(db, deps, job.id, 'numaramı vereyim 0555');
-    expect(text).toBe('selam, naber?');
-    const req = calls.slice(before).find((c) => !c.json);
-    expect(req.messages[0].content).toContain('0555');
-    expect(calls.slice(before).some((c) => c.json)).toBe(false);
+    expect(FILTER_FILLERS).toContain(text);
+    expect(calls.length).toBe(before);
     await completeJob(db, job.id);
   });
 
@@ -278,5 +312,17 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
     const totals = (await db.rpc('diamond_totals')).data.find((r) => r.host_id === host.id);
     expect(Number(totals.today)).toBe(40);
     expect(Number(totals.month)).toBe(40);
+  });
+
+  it('mesajı reddeden (kırmızı ünlem) çevrim içi kişiye bekleme süresince yeniden karşılama kuyruğa alınmaz, kişi yazarsa cevap gider', async () => {
+    const p = `r${Date.now()}`;
+    const first = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, online: true, messages: [] });
+    expect(first.job.kind).toBe('welcome');
+    await db.from('jobs').update({ status: 'failed', error: 'sugo filtresi mesajları reddetti' }).eq('id', first.job.id);
+    const again = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, online: true, messages: [] });
+    expect(again.job).toBeNull();
+    expect(again.refused).toBe(true);
+    const reply = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, messages: [{ dir: 'in', text: 'selam', ts: '1' }] });
+    expect(reply.job.kind).toBe('reply');
   });
 });

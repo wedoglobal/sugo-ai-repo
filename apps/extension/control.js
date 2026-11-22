@@ -4,6 +4,7 @@ const defaults = {
   baseUrl: typeof __VELORA_API_URL__ === 'string' ? __VELORA_API_URL__ : 'https://sugo-host.b-erdincozer.workers.dev',
   apiKey: typeof __VELORA_EXTENSION_API_KEY__ === 'string' ? __VELORA_EXTENSION_API_KEY__ : '',
 };
+const version = () => { try { return `&v=${chrome.runtime.getManifest().version}`; } catch { return ''; } };
 async function localConfig() {
   const c = await chrome.storage.local.get(['baseUrl', 'apiKey', 'hostSugoId', 'enabled']);
   return { ...c, baseUrl: c.baseUrl || defaults.baseUrl, apiKey: c.apiKey || defaults.apiKey };
@@ -32,7 +33,7 @@ async function resolve(c, force = false) {
   inFlight = (async () => {
     let status;
     try {
-      const response = await fetch(`${c.baseUrl.replace(/\/$/, '')}/api/ext/control?host=${encodeURIComponent(c.hostSugoId)}`, { headers: { authorization: `Bearer ${c.apiKey}` }, cache: 'no-store', signal: AbortSignal.timeout(5000) });
+      const response = await fetch(`${c.baseUrl.replace(/\/$/, '')}/api/ext/control?host=${encodeURIComponent(c.hostSugoId)}${version()}`, { headers: { authorization: `Bearer ${c.apiKey}` }, cache: 'no-store', signal: AbortSignal.timeout(5000) });
       if (!response.ok) throw new Error(`Panel bağlantısı HTTP ${response.status}`);
       const { host } = await response.json();
       if (!host?.id || String(host.sugoId) !== String(c.hostSugoId) || typeof host.active !== 'boolean' || !host.revision) throw new Error('Panelden geçerli profil durumu alınamadı.');
@@ -48,7 +49,7 @@ async function resolve(c, force = false) {
   if (cached.key !== key) return resolve(c, true);
   return { ...c, enabled: cached.status.synced && cached.status.active, control: cached.status };
 }
-globalThis.veloraControl = { resolve };
+globalThis.veloraControl = { resolve, localConfig };
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg?.type !== 'sugo-control') return false;
   const url = new URL(sender.url ?? 'about:blank');

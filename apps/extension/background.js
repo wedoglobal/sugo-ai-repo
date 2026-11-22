@@ -1,5 +1,6 @@
 import './automation.js';
 import './control.js';
+import './rest.js';
 import { networkMessage } from './network.js';
 // control.js bağımsız test edilebilsin diye ağ profili uygulayıcısı buradan verilir.
 globalThis.veloraNetworkMessage = networkMessage;

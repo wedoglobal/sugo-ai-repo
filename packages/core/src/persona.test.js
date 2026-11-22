@@ -98,3 +98,12 @@ describe('genel kurallar', () => {
     expect(buildReplyMessages(base)[0].content).not.toContain('Genel kurallar');
   });
 });
+
+describe('bağlama göre kurallar', () => {
+  it('kural varsa sistem metnine bağlamıyla yazılır, yoksa eklenmez', () => {
+    const base = { kind: 'reply', persona: readPersona({}), temp: ['Karşı taraf nedenini soruyor.'], unread: ['neden?'] };
+    const system = buildReplyMessages({ ...base, contextRules: [{ when: 'Karşı taraf nedenini soruyor', rule: 'kısa sebep söyle' }] })[0].content;
+    expect(system).toContain('Karşı taraf nedenini soruyor: kısa sebep söyle');
+    expect(buildReplyMessages(base)[0].content).not.toContain('Bağlama göre kurallar');
+  });
+});

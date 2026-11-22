@@ -1,5 +1,6 @@
 import { pickMedia } from './media.js';
 import { readPersona } from './persona.js';
+import { REFUSAL_COOLDOWN_MS, REFUSED_ERROR } from './refusal.js';
 
 /** Dürtme yalnız son mesajımızdan bu süre içinde yapılır; eski sohbetler sunucu açılınca dürtülmesin. */
 export const NUDGE_WINDOW_MS = 2 * 60 * 60 * 1000;
@@ -30,8 +31,11 @@ export async function queueNudge(db, deps, host, now = deps.now?.() ?? new Date(
   // Aktif işi olan sohbetler tek sorguda elenir; kalanlar için ayrı ayrı sorgu atılmaz.
   const busy = new Set(must(await db.from('jobs').select('pair_id').eq('host_id', host.id).in('status', ['pending', 'processing'])).map((j) => j.pair_id));
 
+  const refusedSince = new Date(now.getTime() - REFUSAL_COOLDOWN_MS).toISOString();
+  const refused = new Set(must(await db.from('jobs').select('pair_id').eq('host_id', host.id).eq('status', 'failed').like('error', `${REFUSED_ERROR}%`).gt('updated_at', refusedSince)).map((j) => j.pair_id));
+
   for (const pair of pairs) {
-    if (busy.has(pair.id)) continue;
+    if (busy.has(pair.id) || refused.has(pair.id)) continue;
     if (visiblePairIds ? !visiblePairIds.includes(pair.id) : pair.delivery_retry_at && ms(pair.delivery_retry_at) > now.getTime()) continue;
     const [last] = must(await db.from('messages').select('direction, created_at').eq('pair_id', pair.id).order('id', { ascending: false }).limit(1));
     if (!last || last.direction !== 'out' || ms(last.created_at) > after) continue;
