@@ -9,6 +9,15 @@
 <div class="page-heading"><div><div class="eyebrow-label">AI PROFILE / #{h.sugo_id}</div><h1>{h.name || 'AI profili'}</h1><p>Karakter, ses ve hafıza ayarlarını bu profilden yönet.</p></div><a class="primary-link" href="/hosts/{h.id}/network">◎ Konum ve bağlantı ↗</a></div>
 
 <div class="card"><ProfileControl host={h} /></div>
+<form method="POST" action="?/copyFrom" class="card"
+  onsubmit={(e) => { if (!confirm('Bu profilin persona, ses, bilgi bankası, model ve tüm medyası seçilen profilinkiyle değiştirilsin mi?')) e.preventDefault(); }}>
+  <label for="src">Başka bir profilden kopyala (persona, ses, bilgi bankası, model ve medya)</label>
+  <select id="src" name="source" required><option value="">— Profil seç —</option>{#each data.others as o (o.id)}<option value={o.id}>{o.name || o.sugo_id} ({o.sugo_id})</option>{/each}</select>
+  <p class="muted">Bu profilin mevcut içeriği silinip yerine yazılır. Ad, profil ID, konum/proxy ve sohbetler korunur.</p>
+  {#if form?.copyError}<p class="err">{form.copyError}</p>{/if}
+  {#if form?.copied}<p class="ok">Kopyalandı.</p>{/if}
+  <p><button>İçeriği kopyala</button></p>
+</form>
 <form method="POST" action="?/import" enctype="multipart/form-data" class="card"
   onsubmit={(e) => { if (!confirm('Mevcut persona, bilgiler ve bilgi bankası dosyadakiyle değiştirilsin mi?')) e.preventDefault(); }}>
   <label for="file">Persona JSON içe aktar (persona, bilgiler, örnekler ve bilgi bankasını doldurur)</label>

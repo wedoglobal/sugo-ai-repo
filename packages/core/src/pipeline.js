@@ -28,7 +28,16 @@ export async function getHost(db, sugoId) {
   return host;
 }
 
-/** Extension kendi sugo id'sini bildirir; host yoksa oluşturulur, varsa ad güncellenir. */
+/** Yeni profile kopyalanacak şablon: persona'sı dolu, en son güncellenen profil. */
+async function pickTemplateHost(db, excludeSugoId) {
+  const rows = must(await db.from('hosts').select('id, persona, knowledge, model').neq('sugo_id', String(excludeSugoId)).order('updated_at', { ascending: false }).limit(20));
+  return rows.find((h) => h.persona && Object.keys(h.persona).length) ?? null;
+}
+
+/**
+ * İstemci kendi sugo id'sini bildirir; host yoksa oluşturulur, varsa ad güncellenir.
+ * Yeni profil, mevcut bir profilin persona/bilgi/model ayarlarını kopyalayıp aktif başlar; kopyalanan profil `clonedFrom` ile döner.
+ */
 export async function syncHost(db, sugoId, name = '') {
   const existing = must(await db.from('hosts').select('*').eq('sugo_id', String(sugoId)).maybeSingle());
   if (existing) {
@@ -37,7 +46,10 @@ export async function syncHost(db, sugoId, name = '') {
     }
     return existing;
   }
-  return must(await db.from('hosts').insert({ sugo_id: String(sugoId), name }).select().single());
+  const template = await pickTemplateHost(db, sugoId);
+  const copy = template ? { persona: template.persona, knowledge: template.knowledge, model: template.model } : {};
+  const host = must(await db.from('hosts').insert({ sugo_id: String(sugoId), name, active: true, ...copy }).select().single());
+  return { ...host, clonedFrom: template?.id ?? null };
 }
 
 async function ensurePair(db, host, peerSugoId, peerName = '') {

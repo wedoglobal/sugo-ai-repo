@@ -3,7 +3,7 @@ import JavaScriptObfuscator from 'javascript-obfuscator';
 import { readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 
-export const PRODUCTION_URL = 'https://sugo-host.b-erdincozer.workers.dev';
+export const PRODUCTION_URL = 'https://studio.elseweb.lol';
 export function extensionSettings(root) {
   const env = parseEnv(readFileSync(new URL('.env', root), 'utf8'));
   const apiKey = env.EXTENSION_API_KEY?.trim();

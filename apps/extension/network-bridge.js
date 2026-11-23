@@ -1,5 +1,5 @@
 (() => {
-  const origins = ['http://localhost:5190', 'http://127.0.0.1:5190', 'https://sugo-host.b-erdincozer.workers.dev'];
+  const origins = ['http://localhost:5190', 'http://127.0.0.1:5190', 'https://studio.elseweb.lol'];
   if (!origins.includes(location.origin)) return;
   window.addEventListener('message', async (event) => {
     if (!/^\/hosts(?:\/[^/]+(?:\/network)?)?\/?$/.test(location.pathname)) return;

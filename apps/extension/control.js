@@ -1,13 +1,15 @@
+// Eski yayın adresi; kayıtlı ayarlarda kalmışsa yeni adrese geçilir.
+const LEGACY_URL = 'https://sugo-host.b-erdincozer.workers.dev';
 let cached;
 let inFlight;
 const defaults = {
-  baseUrl: typeof __VELORA_API_URL__ === 'string' ? __VELORA_API_URL__ : 'https://sugo-host.b-erdincozer.workers.dev',
+  baseUrl: typeof __VELORA_API_URL__ === 'string' ? __VELORA_API_URL__ : 'https://studio.elseweb.lol',
   apiKey: typeof __VELORA_EXTENSION_API_KEY__ === 'string' ? __VELORA_EXTENSION_API_KEY__ : '',
 };
 const version = () => { try { return `&v=${chrome.runtime.getManifest().version}`; } catch { return ''; } };
 async function localConfig() {
   const c = await chrome.storage.local.get(['baseUrl', 'apiKey', 'hostSugoId', 'enabled']);
-  return { ...c, baseUrl: c.baseUrl || defaults.baseUrl, apiKey: c.apiKey || defaults.apiKey };
+  return { ...c, baseUrl: !c.baseUrl || c.baseUrl === LEGACY_URL ? defaults.baseUrl : c.baseUrl, apiKey: c.apiKey || defaults.apiKey };
 }
 /** Panelde kaydedilen GPS/proxy profillerini bu Chrome'a uygular; yalnız içerik değişince veya yerel kayıt farklıysa çalışır. */
 async function syncNetwork(host) {

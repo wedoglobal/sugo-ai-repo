@@ -1,3 +1,5 @@
+// Eski yayın adresi; kayıtlı ayarlarda kalmışsa yeni adrese geçilir.
+const LEGACY_URL = 'https://sugo-host.b-erdincozer.workers.dev';
 import { domainOf } from './network-model.js';
 const $ = (id) => document.getElementById(id);
 let profile;
@@ -74,7 +76,7 @@ $('networkSave').onclick = async () => {
 };
 $('networkOpen').onclick = async () => {
   const c = await chrome.storage.local.get(['baseUrl']);
-  const base = c.baseUrl || (typeof __VELORA_API_URL__ === 'string' ? __VELORA_API_URL__ : 'https://sugo-host.b-erdincozer.workers.dev');
+  const base = (c.baseUrl !== LEGACY_URL && c.baseUrl) || (typeof __VELORA_API_URL__ === 'string' ? __VELORA_API_URL__ : 'https://studio.elseweb.lol');
   await chrome.tabs.create({ url: `${base.replace(/\/$/, '')}/hosts${host ? `/${encodeURIComponent(host)}/network` : ''}` });
 };
 load().catch((e) => $('networkStatus').textContent = e.message);

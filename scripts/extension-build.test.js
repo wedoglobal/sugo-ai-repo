@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { runInNewContext } from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { protectedScript } from './extension-build.js';
-const settings = { baseUrl: 'https://sugo-host.b-erdincozer.workers.dev', apiKey: 'test-bundled-key-never-production' };
+const settings = { baseUrl: 'https://studio.elseweb.lol', apiKey: 'test-bundled-key-never-production' };
 const entry = (path) => fileURLToPath(new URL(`../${path}`, import.meta.url));
 const context = (code, globals) => runInNewContext(code, globals, { timeout: 1500, contextCodeGeneration: { strings: false, wasm: false } });
 

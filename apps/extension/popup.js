@@ -1,3 +1,5 @@
+// Eski yayın adresi; kayıtlı ayarlarda kalmışsa yeni adrese geçilir.
+const LEGACY_URL = 'https://sugo-host.b-erdincozer.workers.dev';
 const $ = (id) => document.getElementById(id);
 let hostId;
 async function refresh() {
@@ -29,7 +31,7 @@ $('bind').onclick = async () => {
 };
 $('save').onclick = async () => {
   const c = await chrome.storage.local.get(['baseUrl']);
-  const base = c.baseUrl || (typeof __VELORA_API_URL__ === 'string' ? __VELORA_API_URL__ : 'https://sugo-host.b-erdincozer.workers.dev');
+  const base = (c.baseUrl !== LEGACY_URL && c.baseUrl) || (typeof __VELORA_API_URL__ === 'string' ? __VELORA_API_URL__ : 'https://studio.elseweb.lol');
   await chrome.tabs.create({ url: `${base.replace(/\/$/, '')}/hosts${hostId ? `/${encodeURIComponent(hostId)}` : ''}` });
 };
 refresh();

@@ -1,0 +1,155 @@
+FrameLayout||||0,0,1080,2400
+ LinearLayout||||0,0,1080,2400
+  FrameLayout||||0,0,1080,2400
+   LinearLayout|action_bar_root|||0,0,1080,2400
+    FrameLayout|android:id/content|||0,0,1080,2400
+     ViewGroup|fitSystemWindowContainer|||0,0,1080,2400
+      ScrollView|coordinator|||0,0,1080,2270
+       LinearLayout|appBarLayout|||0,0,1080,1589
+        LinearLayout|id_profile_header_view|||0,0,1080,1589
+         ScrollView|nsv_header|||0,0,1080,1589
+          LinearLayout||||0,0,1080,1589
+           FrameLayout|pv_profile_avatars_view|||0,0,1080,1264
+            FrameLayout||||0,0,1080,1264
+             FrameLayout||||0,0,1080,1264
+              ViewPager|vp_profile_avatar|||0,0,1080,1264
+               FrameLayout||||0,0,1080,1264
+                ImageView|id_user_avatar_iv|||0,0,1080,1264|c
+               FrameLayout||||1080,0,1080,1264
+                ImageView|id_user_avatar_iv|||1080,0,1080,1264|c
+              View||||0,0,1080,275
+              View||||0,714,1080,1264
+            ViewGroup|cl_parent|||0,1110,1080,1264
+             RecyclerView|rv_profile_avatar_list|||0,1110,1080,1220
+              FrameLayout|fl_profile_little_avatar_item|||44,1110,154,1220
+               FrameLayout||||44,1110,154,1220
+                ImageView|iv_profile_little_avatar_item|||44,1110,154,1220|c
+                View|view_stroke|||44,1110,154,1220
+              FrameLayout|fl_profile_little_avatar_item|||178,1110,288,1220
+               FrameLayout||||178,1110,288,1220
+                ImageView|iv_profile_little_avatar_item|||178,1110,288,1220|c
+              FrameLayout|fl_profile_little_avatar_item|||292,1110,402,1220
+               FrameLayout||||292,1110,402,1220
+                ImageView|iv_profile_little_avatar_item|||292,1110,402,1220|c
+              FrameLayout|fl_profile_little_avatar_item|||406,1110,516,1220
+               FrameLayout||||406,1110,516,1220
+                ImageView|iv_profile_little_avatar_item|||406,1110,516,1220|c
+              FrameLayout|fl_profile_little_avatar_item|||520,1110,630,1220
+               FrameLayout||||520,1110,630,1220
+                ImageView|iv_profile_little_avatar_item|||520,1110,630,1220|c
+              FrameLayout|fl_profile_little_avatar_item|||634,1110,744,1220
+               FrameLayout||||634,1110,744,1220
+                ImageView|iv_profile_little_avatar_item|||634,1110,744,1220|c
+           ViewGroup|pv_profile_user_basic_view|||0,1264,1080,1589
+            ViewGroup||||0,1264,1080,1589
+             ViewGroup|basic_info_right|||1058,1286,1058,1286
+             ViewGroup|basic_info_left|||44,1319,1036,1534
+              ViewGroup|nameParentView|||44,1319,1036,1393
+               ViewGroup|tv_profile_basic_name|||44,1319,329,1393
+                ImageView|bg_pag_view|||44,1319,329,1393
+                TextView|txt_tv|Fırfır Kazım||44,1319,329,1393
+                ImageView|fore_pag_view|||44,1319,329,1393
+              ViewGroup|onlineParenView|||44,1404,407,1457
+               View|view_profile_basic_online|||44,1420,66,1442
+               TextView|tv_profile_basic_online|çevrimiçi||83,1404,237,1457
+               View|view_profile_basic_divide|||248,1428,254,1434
+               TextView|tv_profile_basic_distance|4561km||265,1404,407,1457
+              ViewGroup|fl_label_flow|||44,1468,1036,1534
+               FrameLayout|gv_profile_basic_gender_age|||44,1481,134,1520
+                LinearLayout|id_gender_age_root|||44,1481,134,1520
+                 ImageView||||55,1489,77,1511
+                 TextView|id_gender_age_tv|‎‎ ‎‎30‎‎‎ ‎||77,1484,123,1517
+               FrameLayout|view_wealth|||140,1481,228,1520
+                FrameLayout||||140,1481,228,1520
+                 ImageView|iv_wealth_bg|||140,1481,228,1520
+                 TextView|tv_wealth_level|32||187,1481,219,1519
+               ImageView|iv_profile_base_charm|||234,1481,322,1520
+               ImageView|iv_profile_basic_vip|||328,1481,452,1520
+               ImageView|iv_svip|||458,1468,637,1534
+       LinearLayout||||0,1589,1080,2270
+        ScrollView|id_profile_scroll_view|||0,1589,1080,1721
+         ViewGroup||||0,1589,1080,1721
+          HorizontalScrollView|id_tab_layout|||0,1589,1080,1710
+           LinearLayout||||0,1589,747,1710
+            TextView|id_profile_tab_userinfo|Profil||0,1589,179,1710|c
+            TextView|id_profile_tab_glory|Onur||179,1589,330,1710|c
+            TextView|id_profile_tab_moments|durum 3||330,1589,549,1710|c
+            TextView|id_profile_tab_relationship_tv|İlişkiler||549,1623,747,1675|c
+        ViewPager|id_view_pager|||0,1721,1080,2270
+         ScrollView|sv_profile_info|||0,1721,1080,2270
+          LinearLayout||||0,1721,1080,2270
+           LinearLayout|room_family_paren_view|||33,1776,1047,1952
+            ViewGroup|ProfileAudioRoomView|||44,1776,1036,1952
+             ViewGroup|audio_room_root|||44,1776,1036,1952|c
+              ImageView|audioRoomBg|||44,1776,1036,1952
+              FrameLayout|clip_profile_audio_room_cover|||66,1798,198,1930
+               ImageView|iv_profile_audio_room_cover|||66,1798,198,1930
+              ImageView|iv_profile_room_lock|||72,1804,116,1848
+              ViewGroup|rightContentView|||220,1816,1014,1912
+               TextView|tv_profile_audio_room_title|Onun Odası||220,1816,423,1862
+               LinearLayout|tagParentView|||220,1879,286,1912
+                LinearLayout|ll_profile_audio_room_num|||220,1879,286,1912
+                 ImageView||||226,1879,259,1912
+                 TextView|tv_profile_audio_room_num|0||259,1879,275,1912
+              ImageView|audioRoomBgTag|||629,1776,1036,1952
+           View|line1|||44,2007,1036,2013
+           ViewGroup|pv_profile_personal_tag|||0,2068,1080,2230|c
+            TextView|tv_personal_tag_title|Profil Etiketleri||44,2068,329,2120
+            FrameLayout|fl_personal_tag_container|||44,2153,1036,2230
+             ViewGroup|fl_personal_tag_list|||44,2153,1036,2230
+              LinearLayout||||44,2153,245,2230
+               TextView|tv_personal_tag_text|👻 Korku||77,2172,212,2211
+           View|line_personal_tag|||44,2285,1036,2270
+           ViewGroup|pv_profile_extend_info|||0,2346,1080,2270
+            LinearLayout|cl_profile_extend_info|||0,2346,1080,2270
+             TextView|tv_profile_extend_info_title|Bilgi||44,2346,129,2270
+             TextView|tv_profile_sign_content|Üzüleceksin işte o zaman , boşa oyaladın zamana beni 🫈🧌||44,2438,1036,2270
+             LinearLayout|user_information_view|||44,2563,1036,2270
+              LinearLayout|uid_root|||44,2563,1036,2270|c
+               ImageView||||44,2596,110,2270
+               TextView||ID||132,2606,169,2270
+               TextView|uidView|100000001||180,2606,378,2270
+               ImageView|copyView|||384,2601,439,2270
+              LinearLayout|industry_root|||44,2695,1036,2270
+               ImageView||||44,2728,110,2270
+               TextView|industryContentView|Alan yan keski ||132,2738,390,2270
+              LinearLayout|profession_root|||44,2827,1036,2270
+               ImageView||||44,2860,110,2270
+               TextView|professionContentView|Meslek enektar||132,2870,398,2270
+              LinearLayout|habitation_root|||44,2959,1036,2270
+               ImageView||||44,2992,110,2270
+               TextView|habitationContentView|Mevcut konumlar Netherlands||132,3002,655,2270
+              LinearLayout|birthday_root|||44,3091,1036,2270
+               ImageView||||44,3124,110,2270
+               TextView|birthdayContentView|Doğum günü 03/11||132,3134,470,2270
+              LinearLayout|constellation_root|||44,3223,1036,2270
+               ImageView||||44,3256,110,2270
+               TextView|constellationContentView|Burçlar balık||132,3266,346,2270
+              LinearLayout|registration_time_root|||44,3355,1036,2270
+               ImageView||||44,3388,110,2270
+               TextView|registrationTimeContentView|Kayıt zamanı 2025/06/16||132,3398,573,2270
+         ScrollView|gloryVerticalScroll|||1080,1721,1080,2270
+          LinearLayout|wallsContainer|||1080,1721,1080,2051
+           LinearLayout|gloryRowTop|||1124,1754,1080,1754
+           LinearLayout|gloryRowBottom|||1124,1776,1080,1776
+      FrameLayout|id_title_container_fl|||0,0,1080,214
+       ViewGroup|titleBarParentView|||0,93,1080,214
+        ImageView|backBtn|||28,104,127,203|c
+        LinearLayout|titleParentView|||174,115,763,192
+         FrameLayout||||303,115,380,192
+          ImageView|titleAvatarView|||303,115,380,192
+         TextView|titleView|Fırfır Kazım||402,127,634,179
+        ImageView|shareProfile|||810,104,909,203|c
+        ImageView|editOrMoreBtn|||953,104,1052,203|c
+      ViewGroup|pv_profile_button_view|||0,1940,1080,2270
+       ViewGroup|bottomBtnRoot|||0,1940,1080,2270
+        ViewGroup|bottomBtnParent|||22,2061,1058,2215|c
+         FrameLayout||||22,2061,1058,2215
+          ViewGroup||||22,2061,1058,2215
+           ImageView|videoBtn|||44,2061,198,2215|c
+           ImageView|followBtn|||220,2061,374,2215|c
+           ImageView|chatBtn|||396,2061,550,2215|c
+           LinearLayout|pickBtn|||572,2061,1036,2215|c
+            ImageView||||647,2105,713,2171
+            TextView||Merhaba de||724,2112,961,2164
+ View|android:id/navigationBarBackground|||0,2270,1080,2400

@@ -1,7 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { EXAMPLE_LIMIT, FACT_LIMIT, LEVEL_FIELDS, LEVEL_LABELS, LEVEL_RULES, SPEECH_VOICES, importPersona, readPersona } from '@sugo/core';
 import { db, deps, must } from '$lib/server/deps.js';
-import { BUCKET, MAX_BYTES } from '$lib/server/media.js';
+import { BUCKET, MAX_BYTES, replaceMedia } from '$lib/server/media.js';
 
 const text = (v, n) => String(v ?? '').trim().slice(0, n);
 const jsonList = (v) => {
@@ -20,8 +20,10 @@ export const load = async ({ params }) => {
   const media = must(await db().from('media').select('id, name, content_type').eq('host_id', params.id).order('created_at'));
   const sent = media.length ? must(await db().from('media_sent').select('media_id').in('media_id', media.map((m) => m.id))) : [];
   const sentCount = Object.groupBy(sent, (s) => s.media_id);
+  const others = must(await db().from('hosts').select('id, sugo_id, name').neq('id', params.id).order('created_at'));
   return {
     host,
+    others,
     persona: readPersona(host.persona),
     knowledge: (Array.isArray(host.knowledge) ? host.knowledge : []).map((k) => ({ title: text(k.title, 100), content: text(k.content, 2000), active: k.active !== false })),
     voices: SPEECH_VOICES,
@@ -78,6 +80,20 @@ export const actions = {
     }).eq('id', params.id);
     if (err) return fail(400, { importError: err.message });
     return { imported: { name: result.name, knowledge: result.knowledge.length, facts: result.persona.facts.length, examples: result.persona.examples.length, skipped: result.skipped, warnings: result.warnings } };
+  },
+  copyFrom: async ({ request, params }) => {
+    const sourceId = String((await request.formData()).get('source') ?? '').trim();
+    if (!sourceId || sourceId === params.id) return fail(400, { copyError: 'Kaynak profil seç' });
+    const source = must(await db().from('hosts').select('persona, knowledge, model').eq('id', sourceId).maybeSingle());
+    if (!source) return fail(400, { copyError: 'Kaynak profil bulunamadı' });
+    // Ad, sugo id, konum/proxy, sohbetler ve kuyruk korunur; persona (ses dahil), bilgi bankası, model ve medya kaynaktan alınır.
+    const mediaError = await replaceMedia(sourceId, params.id);
+    if (mediaError) return fail(400, { copyError: `Medya kopyalanamadı: ${mediaError}` });
+    const { error: err } = await db().from('hosts').update({
+      persona: source.persona, knowledge: source.knowledge, model: source.model, updated_at: new Date().toISOString(),
+    }).eq('id', params.id);
+    if (err) return fail(400, { copyError: err.message });
+    return { copied: true };
   },
   upload: async ({ request, params }) => {
     const files = (await request.formData()).getAll('files').filter((f) => f instanceof File && f.size);

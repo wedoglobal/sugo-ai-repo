@@ -1,13 +1,15 @@
+// Eski yayın adresi; kayıtlı ayarlarda kalmışsa yeni adrese geçilir.
+const LEGACY_URL = 'https://sugo-host.b-erdincozer.workers.dev';
 // API çağrıları burada yapılır; content script sayfa origin'inden istek atamaz.
 const DEFAULTS = {
-  baseUrl: typeof __VELORA_API_URL__ === 'string' ? __VELORA_API_URL__ : 'https://sugo-host.b-erdincozer.workers.dev',
+  baseUrl: typeof __VELORA_API_URL__ === 'string' ? __VELORA_API_URL__ : 'https://studio.elseweb.lol',
   apiKey: typeof __VELORA_EXTENSION_API_KEY__ === 'string' ? __VELORA_EXTENSION_API_KEY__ : '',
   hostSugoId: '', enabled: false,
 };
 
 async function config(force = false) {
   const stored = await chrome.storage.local.get(Object.keys(DEFAULTS));
-  const local = { ...DEFAULTS, ...stored, baseUrl: stored.baseUrl || DEFAULTS.baseUrl, apiKey: stored.apiKey || DEFAULTS.apiKey };
+  const local = { ...DEFAULTS, ...stored, baseUrl: !stored.baseUrl || stored.baseUrl === LEGACY_URL ? DEFAULTS.baseUrl : stored.baseUrl, apiKey: stored.apiKey || DEFAULTS.apiKey };
   return globalThis.veloraControl ? globalThis.veloraControl.resolve(local, force) : local;
 }
 

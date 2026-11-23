@@ -1,0 +1,522 @@
+FrameLayout||||0,0,1080,2400
+ LinearLayout||||0,0,1080,2400
+  FrameLayout||||0,0,1080,2400
+   LinearLayout|action_bar_root|||0,0,1080,2400
+    FrameLayout|android:id/content|||0,0,1080,2400
+     FrameLayout|fl_main|||0,0,1080,2400
+      LinearLayout||||0,0,1080,2400
+       ViewGroup|id_main_fragment_container|||0,0,1080,2115
+        FrameLayout|id_main_home_fragment_root|||0,0,-2160,2115
+         ViewGroup||||0,93,-2160,2115
+          RelativeLayout|tab_layout_container|||0,93,-2507,225
+           HorizontalScrollView|id_tab_layout|||0,93,-2507,225
+            LinearLayout||||0,93,-2507,225
+             FrameLayout|id_home_tab_online|||0,93,-3007,225|c
+              LinearLayout||||0,93,-3007,225
+               TextView|tabText|Önerilen||0,128,-3007,186
+               ImageView|tabSlider|||0,200,-3057,214
+             FrameLayout|id_home_tab_real_nearby|||0,93,-2715,225|c
+              LinearLayout||||0,93,-2715,225
+               TextView|tabText|Yakınlarda||0,128,-2715,186
+               ImageView|tabSlider|||0,200,-2789,214
+             FrameLayout|id_home_tab_new|||0,93,-2507,225|c
+              LinearLayout||||0,93,-2507,225
+               TextView|tabText|Yeni kullanıcılar||0,128,-2507,186
+               ImageView|tabSlider|||0,200,-2507,214
+             FrameLayout|id_home_tab_recommend|||0,93,-2507,225|c
+              LinearLayout||||0,93,-2507,225
+               TextView|tabText|Öne Çıkanlar||0,128,-2507,186
+               ImageView|tabSlider|||0,200,-2507,214
+          ImageView|searchAction|||0,126,-2424,192|c
+          ViewPager|id_view_pager|||0,225,-2160,2115
+           FrameLayout|id_refresh_layout|||0,225,-2160,2115
+            ViewGroup|id_refresh_layout|||0,225,-2160,2115
+             RelativeLayout||||0,225,-2160,225
+              LinearLayout|srl_classics_center|||0,225,-2700,159
+               TextView|srl_classics_update|'Last Update' M-d HH:mm||0,225,-2700,159
+               TextView|srl_classics_title|Refresh Success||0,225,-2700,159
+             FrameLayout|id_refresh_layout|||0,225,-2160,2115
+              RecyclerView||||0,225,-2160,2115
+               ViewGroup||||0,225,-2160,566
+                ViewGroup|item_recommend|||0,225,-2160,445
+                 View|groupRecVideo|||0,258,-3210,258
+                 View|groupAnonymous|||0,258,-3210,258
+                 View|lvAnonymousMatch|||0,258,-2714,434|c
+                 TextView|tvAnonymousTitle|SoulLink||0,298,-2747,344
+                 TextView|tvRecVideoTitle|Video Odası||0,298,-2237,344
+                 TextView|tvAnonymousDes|79186689 kişi anonim sohbeti açtı||0,355,-2959,394
+                 FrameLayout|flAnonymousBg|||0,258,-2714,434
+                  ImageView|ivAnonymousBg|||0,258,-2714,434
+                 View|lvRecVideo|||0,258,-2204,434|c
+                 TextView|tvRecVideoDes|37332567 kişi katıldı||0,355,-2361,394
+                 FrameLayout|flRecVideoBg|||0,258,-2204,434
+                  ImageView|ivRecVideoBg|||0,258,-2204,434
+                ViewGroup|item_upload_guide|||0,456,-2204,566
+                 ImageView|iv_upload_guide|||0,478,-3108,544
+                 TextView|tv_show_upload_guide|Görünürlüğünü artırmak için gerçek bir fotoğraf yükle||0,456,-2446,566
+                 TextView|tv_guide_to_upload|Yükle||0,481,-2309,542|c
+                 ImageView|iv_close_upload_photo_guide|||0,489,-2232,533|c
+               ViewGroup||||0,588,-2204,841|c
+                ViewGroup|layout_nearby_user|||0,588,-2204,841
+                 ImageView|id_user_avatar_iv|||0,621,-2976,808
+                 View|id_online_indicator|||0,632,-2987,664
+                 ViewGroup|user_info|||0,632,-2479,684
+                  TextView|id_user_name_tv|Fırfır Kazım||0,632,-2711,684
+                 FrameLayout|include_gender_age|||0,701,-2859,734
+                  LinearLayout|id_gender_age_root|||0,701,-2859,734
+                   ImageView||||0,706,-2910,728
+                   TextView|id_gender_age_tv|‎‎ ‎‎30‎‎‎ ‎||0,703,-2870,732
+                 ImageView|iv_svip|||0,693,-2704,743
+                 TextView|id_distance_tv|4561km||0,751,-2801,797
+                 TextView|tv_point|·||0,751,-2791,797
+                 TextView|id_user_desc_tv|Üzüleceksin işte o zaman , boşa oyaladın zamana beni 🫈🧌||0,751,-2479,797
+                 FrameLayout|libxFrameLayout|||0,640,-2237,789
+                  ImageView|id_user_opt_msiv|||0,640,-2237,789|c
+               ViewGroup||||0,863,-2204,1116|c
+                ViewGroup|layout_nearby_user|||0,863,-2204,1116
+                 ImageView|id_user_avatar_iv|||0,896,-2976,1083
+                 View|id_online_indicator|||0,907,-2987,939
+                 ViewGroup|user_info|||0,907,-2479,959
+                  TextView|id_user_name_tv|knight||0,907,-2820,959
+                 FrameLayout|include_gender_age|||0,976,-2859,1009
+                  LinearLayout|id_gender_age_root|||0,976,-2859,1009
+                   ImageView||||0,981,-2910,1003
+                   TextView|id_gender_age_tv|‎‎ ‎‎35‎‎‎ ‎||0,978,-2870,1007
+                 ImageView|iv_svip|||0,968,-2704,1018
+                 ImageView|id_user_noble|||0,968,-2648,1018
+                 TextView|id_distance_tv|312km||0,1026,-2823,1072
+                 TextView|tv_point|·||0,1026,-2813,1072
+                 TextView|id_user_desc_tv|Herkez seni ayakda durduğun kadar bilir. Nasıl ayakda durduğunu bir sen bilirsin .||0,1026,-2479,1072
+                 FrameLayout|libxFrameLayout|||0,915,-2237,1064
+                  ImageView|id_user_opt_msiv|||0,915,-2237,1064|c
+               ViewGroup||||0,1138,-2204,1391|c
+                ViewGroup|layout_nearby_user|||0,1138,-2204,1391
+                 ImageView|id_user_avatar_iv|||0,1171,-2976,1358
+                 View|id_online_indicator|||0,1182,-2987,1214
+                 ViewGroup|user_info|||0,1182,-2479,1234
+                  TextView|id_user_name_tv|Cekiiiii||0,1182,-2812,1234
+                 FrameLayout|include_gender_age|||0,1251,-2859,1284
+                  LinearLayout|id_gender_age_root|||0,1251,-2859,1284
+                   ImageView||||0,1256,-2910,1278
+                   TextView|id_gender_age_tv|‎‎ ‎‎25‎‎‎ ‎||0,1253,-2870,1282
+                 ImageView|newUserTag|||0,1251,-2773,1284
+                 ImageView|iv_online_vip|||0,1251,-2643,1284
+                 TextView|id_distance_tv|1066km||0,1301,-2801,1347
+                 FrameLayout|libxFrameLayout|||0,1190,-2237,1339
+                  ImageView|id_user_opt_msiv|||0,1190,-2237,1339|c
+               ViewGroup||||0,1413,-2204,1666|c
+                ViewGroup|layout_nearby_user|||0,1413,-2204,1666
+                 View|view_live_circle|||0,1435,-2965,1644
+                 ImageView|id_user_avatar_iv|||0,1446,-2976,1633
+                 View|id_online_indicator|||0,1457,-2987,1489
+                 ViewGroup|user_info|||0,1457,-2479,1509
+                  TextView|id_user_name_tv|☣️KESKİN⚜️||0,1457,-2682,1509
+                 FrameLayout|include_gender_age|||0,1526,-2859,1559
+                  LinearLayout|id_gender_age_root|||0,1526,-2859,1559
+                   ImageView||||0,1531,-2910,1553
+                   TextView|id_gender_age_tv|‎‎ ‎‎41‎‎‎ ‎||0,1528,-2870,1557
+                 ImageView|iv_online_vip|||0,1526,-2729,1559
+                 ImageView|id_user_noble|||0,1518,-2673,1568
+                 FrameLayout|id_lfl_recommend_room_msg|||0,1517,-2237,1563
+                  TextView|id_room_tag|Video Sohbet||0,1517,-2237,1563
+                 ImageView|include_recommend_room_info_icon|||0,1603,-3025,1647
+                 TextView|id_user_desc_tv|Video partime gel ve birlikte sıkıntının sınırlarını aşalım||0,1576,-2479,1622
+               ViewGroup||||0,1677,-2160,1951
+                FrameLayout|rounded_frameLayout|||0,1699,-2204,1929
+                 ViewPager|id_users_banner_vp|||0,1699,-2204,1929
+                  ImageView||||0,1699,-3196,1929|c
+                  ImageView||||0,1699,-2204,1929|c
+                  ImageView||||0,1699,-2204,1929|c
+                 View|id_banner_indicator|||0,1898,-2580,1915
+               ViewGroup||||0,1962,-2204,2115|c
+                ViewGroup|layout_nearby_user|||0,1962,-2204,2115
+                 ImageView|id_user_avatar_iv|||0,1995,-2976,2115
+                 View|id_online_indicator|||0,2006,-2987,2038
+                 ViewGroup|user_info|||0,2006,-2479,2058
+                  TextView|id_user_name_tv|Sami Acar||0,2006,-2740,2058
+                 FrameLayout|include_gender_age|||0,2075,-2859,2108
+                  LinearLayout|id_gender_age_root|||0,2075,-2859,2108
+                   ImageView||||0,2080,-2910,2102
+                   TextView|id_gender_age_tv|‎‎ ‎‎40‎‎‎ ‎||0,2077,-2870,2106
+                 ImageView|newUserTag|||0,2075,-2773,2108
+                 ImageView|iv_online_vip|||0,2075,-2643,2108
+                 TextView|id_distance_tv|431km||0,2125,-2823,2115
+                 FrameLayout|libxFrameLayout|||0,2014,-2237,2115
+                  ImageView|id_user_opt_msiv|||0,2014,-2237,2115|c
+           FrameLayout|id_refresh_layout|||0,225,-2160,2115
+            ViewGroup|id_refresh_layout|||0,225,-2160,2115
+             RelativeLayout||||0,225,-2160,225
+              View|sugo_biz_loading|||0,225,-2160,214
+              LinearLayout|srl_classics_center|||0,225,-2160,159
+               TextView|srl_classics_update|'Last Update' M-d HH:mm||0,225,-2160,159
+               TextView|srl_classics_title|Pull Down To Refresh||0,225,-2160,159
+              ImageView|srl_classics_arrow||<Adsız>|0,225,-2160,159
+             FrameLayout|id_refresh_layout|||0,225,-2160,2115
+              RecyclerView||||0,225,-2160,2115
+          ImageView|filterAction|||0,93,-2270,236|c
+          ImageView|id_tb_action_show_rank_v2|||0,93,-2160,236|c
+        ViewGroup|id_main_home_fragment_conv|||0,0,1080,2115
+         ViewGroup|topRootView|||0,93,1080,225
+          RelativeLayout|tab_layout_container|||0,93,948,225
+           HorizontalScrollView|id_tab_layout|||0,93,948,225
+            LinearLayout||||0,93,637,225
+             FrameLayout|tab_msg|||17,93,422,225|c
+              LinearLayout||||45,93,394,225
+               FrameLayout|tabFLText|||45,128,394,186
+                LinearLayout|ll_tab|||45,128,394,186
+                 TextView|tabText|Bağlantı Kesildi||45,128,394,186
+               ImageView|tabSlider|||175,200,263,214
+             FrameLayout|tab_friend|||422,93,620,225|c
+              LinearLayout||||450,93,592,225
+               TextView|tabText|Kişiler||450,128,592,186
+               ImageView|tabSlider|||477,200,565,214
+          ImageView|id_tb_action_search|||838,104,948,214|c
+          ImageView|id_tb_action_more|||948,104,1058,214|c
+         ViewPager|view_pager|||0,225,1080,2115
+          ViewGroup||||0,225,1080,2115
+           ViewGroup|id_layout_notify_tab|||0,225,1080,503
+            LinearLayout|fl_notification_open_tips|||44,247,1036,357|c
+             ImageView||||77,269,143,335
+             TextView|contentView|Önemli mesajları almak için bildirimleri etkinleştirin||171,279,614,325
+             TextView|tv_turn_on_notify|Etkinleştirmek için git||642,271,942,332|c
+             ImageView|id_notification_open_guide_close_iv|||942,255,1036,349|c
+            HorizontalScrollView|id_tab_layout|||0,357,1080,503
+             LinearLayout||||28,390,1080,470
+              TextView|id_conv_tab_all|Hepsi||45,390,233,470|c
+              TextView|id_conv_tab_online|Çevrimiçi||267,390,514,470|c
+              TextView|id_conv_tab_intimacy|En çok sohbet edilen||548,390,995,470|c
+              TextView|id_conv_tab_unread|Okunmamış||1029,390,1080,470|c
+              TextView|id_conv_tab_fav_follow|Favoriler||1361,390,1080,470|c
+              TextView|id_conv_tab_following|Takip Et||1631,390,1080,470|c
+              TextView||||1874,390,1080,470
+           ViewPager|id_view_pager|||0,503,1080,2115
+            ViewGroup|id_main_home_fragment_conv|||0,503,1080,2115
+             RecyclerView|id_recycler_view|||0,503,1080,2115
+              ViewGroup|fl_header_notification|||0,509,1080,719|c
+               ImageView|iv_interaction_notify|||44,537,198,691
+               TextView|tv_interaction_notify_title|Bildirimler||231,554,885,606
+               TextView|tv_interaction_notify_time|26-07-29||918,563,1036,598
+               TextView|notify_vice_title|‎ᴾᵃᵗʳᵒⁿᴍᴇʟɪʜ 🦅 ‎‎sizi oda üyesi olmaya davet etti‎||231,628,1036,674
+              FrameLayout|fl_header_audio|||0,719,1080,929|c
+               ImageView|iv_audio_room_icon|||44,747,198,901
+               LinearLayout||||231,764,860,884
+                TextView|chatTitleTv|Sohbet Odam||231,764,499,816
+                TextView|chatSubTitleTv|Odaya girin ve arkadaşlarınızla sohbet edin||231,838,860,884
+               FrameLayout|ll_audio_room_cover|||1080,824,1080,824
+              FrameLayout|fl_header_sugo_team|||0,929,1080,1139|c
+               FrameLayout|sugo_team_avatar|||0,929,198,1139
+                ImageView|iv_sugo_team_icon|||44,957,198,1111
+               LinearLayout||||231,974,1080,1094
+                LinearLayout||||231,974,1080,1026
+                 ViewGroup||||231,974,1080,1026
+                  TextView|id_sugo_team_title|SUGO TEAM||231,974,477,1026
+                  ImageView||||488,974,538,1024
+                  TextView|id_sugo_team_time|12:50||961,983,1036,1018
+                LinearLayout||||231,1048,1080,1094
+                 LinearLayout||||231,1048,860,1094
+                  TextView|id_sugo_team_content|Profil resminizi gerçek bir resme dönüştürdünüz. Maruziyetiniz ve hesap durumunuz geri yüklendi.||231,1048,860,1094
+               TextView|id_sugo_team_count|99+||946,1055,1036,1106
+              ViewGroup|cl_im_feed|||0,1139,1080,1349|c
+               ImageView|iv_im_feed|||44,1167,198,1321
+               TextView|tv_im_feed_title|Anlar||231,1184,860,1236
+               TextView|tv_im_feed_abstract|Düşüncelerini paylaş||231,1258,860,1304
+              FrameLayout|fl_header_group|||0,1349,1080,1559|c
+               FrameLayout|family_avatar|||0,1349,198,1559|c
+                ImageView|ivGroupIcon|||44,1377,198,1531
+               LinearLayout||||231,1394,1080,1514
+                LinearLayout||||231,1394,838,1514
+                 ViewGroup||||231,1394,838,1446
+                  TextView|id_group_chat_title|Altın kazanmak için bir aileye katılın.||231,1394,838,1446
+                 LinearLayout||||231,1468,838,1514
+                  TextView|id_text_at_remind|||231,1468,231,1514
+                  LinearLayout||||237,1468,794,1514
+                   TextView|id_group_chat_content|Arkadaşlarımın 3'sı zaten aileye katıldı.||237,1468,794,1514
+                  LinearLayout||||838,1514,838,1514
+                ViewGroup||||838,1410,1036,1498
+                 ViewGroup|convFamilyHeadersView|||838,1410,1036,1498
+                  ViewGroup|family_un_create_root|||838,1410,1036,1498
+                   ViewGroup||||838,1410,1036,1498
+                    ViewGroup|headerParent1|||838,1410,926,1498
+                     ImageView|header1|||844,1416,921,1493
+                    ViewGroup|headerParent2|||893,1410,981,1498
+                     ImageView|header2|||899,1416,976,1493
+                    ViewGroup|headerParent3|||948,1410,1036,1498
+                     ImageView|header3|||954,1416,1031,1493
+                View||||1036,1394,1080,1514
+              FrameLayout|fl_header_visitor|||0,1559,1080,1757|c
+               ImageView|iv_last_visitor_icon|||44,1581,198,1735
+               LinearLayout||||231,1598,860,1718
+                TextView|visitorTitleTv|Ziyaretçiler||231,1598,455,1650
+                TextView|visitorSubTitleTv|Sizi 2Dakika önce ziyaret ettim||231,1672,759,1718
+              ViewGroup||||0,1757,1080,1967|c
+               ViewGroup|ll_chat_item|||0,1757,1080,1967
+                ImageView|id_user_avatar_iv|||44,1785,198,1939|c
+                View|id_online_indicator|||159,1785,192,1818
+                TextView|id_user_name_tv|Emir||231,1803,321,1855
+                FrameLayout|fl_tags|||321,1829,321,1829
+                View|space_holder|||620,1827,653,1830
+                TextView|id_online_time_tv|12:52||952,1809,1036,1848
+                ViewGroup|ll_bottom|||231,1872,1036,1922
+                 TextView|id_latest_msg_tv|Ne yiyeceğimi bilmiyorum. Bir şey tavsiye edebilir misin?||231,1874,1003,1920
+                 LinearLayout|id_unread_ll|||1036,1872,1036,1922
+              ViewGroup||||0,1967,1080,2115|c
+               ViewGroup|ll_chat_item|||0,1967,1080,2115
+                ImageView|id_user_avatar_iv|||44,1995,198,2115|c
+                View|id_online_indicator|||159,1995,192,2028
+                TextView|id_user_name_tv|Mert 👾||231,2013,392,2065
+                FrameLayout|fl_tags|||392,2039,392,2039
+                View|space_holder|||656,2037,689,2040
+                TextView|id_online_time_tv|12:50||952,2019,1036,2058
+                ViewGroup|ll_bottom|||231,2082,1036,2115
+                 TextView|id_latest_msg_tv|selam||231,2084,336,2115
+                 LinearLayout|id_unread_ll|||1036,2082,1036,2115
+            ViewGroup||||1080,503,1080,2115
+             RecyclerView|id_recycler_view|||1080,503,1080,2115
+              ViewGroup||||1080,503,1080,713|c
+               ViewGroup|ll_chat_item|||1080,503,1080,713
+                ImageView|id_user_avatar_iv|||1124,531,1080,685|c
+                View|id_online_indicator|||1239,531,1080,564
+                TextView|id_user_name_tv|Emir||1311,549,1080,601
+                FrameLayout|fl_tags|||1401,575,1080,575
+                View|space_holder|||1700,573,1080,576
+                TextView|id_online_time_tv|12:52||2032,555,1080,594
+                ViewGroup|ll_bottom|||1311,618,1080,668
+                 TextView|id_latest_msg_tv|Ne yiyeceğimi bilmiyorum. Bir şey tavsiye edebilir misin?||1311,620,1080,666
+                 LinearLayout|id_unread_ll|||2116,618,1080,668
+              ViewGroup||||1080,713,1080,923|c
+               ViewGroup|ll_chat_item|||1080,713,1080,923
+                ImageView|id_user_avatar_iv|||1124,741,1080,895|c
+                View|id_online_indicator|||1239,741,1080,774
+                TextView|id_user_name_tv|Mert 👾||1311,759,1080,811
+                FrameLayout|fl_tags|||1472,785,1080,785
+                View|space_holder|||1736,783,1080,786
+                TextView|id_online_time_tv|12:50||2032,765,1080,804
+                ViewGroup|ll_bottom|||1311,828,1080,878
+                 TextView|id_latest_msg_tv|selam||1311,830,1080,876
+                 LinearLayout|id_unread_ll|||2116,828,1080,878
+              ViewGroup||||1080,923,1080,1133|c
+               ViewGroup|ll_chat_item|||1080,923,1080,1133
+                ImageView|id_user_avatar_iv|||1124,951,1080,1105|c
+                View|id_online_indicator|||1239,951,1080,984
+                TextView|id_user_name_tv|knight||1311,969,1080,1021
+                FrameLayout|fl_tags|||1434,995,1080,995
+                View|space_holder|||1717,993,1080,996
+                TextView|id_online_time_tv|12:50||2032,975,1080,1014
+                ViewGroup|ll_bottom|||1311,1038,1080,1088
+                 TextView|id_latest_msg_tv|Şu anda ne yapıyorsun?||1311,1040,1080,1086
+                 LinearLayout|id_unread_ll|||2116,1038,1080,1088
+           FrameLayout|anony_banner_view|||648,1845,1036,1977|c
+            ViewGroup||||648,1845,1036,1977
+             ViewPager|vp_loop|||670,1870,835,1953
+              RecyclerView||||711,1870,794,1953
+               ViewGroup||||711,1878,495,1945
+                ImageView|iv_head|||711,1878,495,1945
+               ViewGroup||||711,1878,537,1945
+                ImageView|iv_head|||711,1878,537,1945
+               ViewGroup||||711,1878,578,1945
+                ImageView|iv_head|||711,1878,578,1945
+               ViewGroup||||711,1878,620,1945
+                ImageView|iv_head|||711,1878,620,1945
+               ViewGroup||||711,1878,661,1945
+                ImageView|iv_head|||711,1878,661,1945
+               ViewGroup||||711,1878,703,1945
+                ImageView|iv_head|||711,1878,703,1945
+               ViewGroup||||711,1878,744,1945
+                ImageView|iv_head|||711,1878,744,1945
+               ViewGroup||||711,1870,794,1953
+                ImageView|iv_head|||711,1870,794,1953
+               ViewGroup||||761,1878,794,1945
+                ImageView|iv_head|||761,1878,794,1945
+               ViewGroup||||802,1878,794,1945
+                ImageView|iv_head|||802,1878,794,1945
+               ViewGroup||||844,1878,794,1945
+                ImageView|iv_head|||844,1878,794,1945
+             TextView|tv_text|SoulLink||852,1888,1003,1934
+          LinearLayout||||1080,225,1080,2115
+           LinearLayout|ll_relation_tabs|||1080,225,1080,359
+            HorizontalScrollView|id_tab_layout|||1080,225,1080,359
+             LinearLayout||||1113,258,1080,326
+              TextView|id_relations_tab_followings|Takip et(3)||1124,258,1080,326|c
+              TextView|id_relations_tab_friends|Arkadaşlar(2)||1376,258,1080,326|c
+              TextView|id_relations_tab_followers|Takipçiler(2)||1676,258,1080,326|c
+              TextView|id_relations_tab_groups|Gruplar(0)||1956,258,1080,326|c
+            ImageView|iv_contacts_sort||Filtre|2017,226,1080,358|c
+           ViewPager|id_view_pager|||1080,359,1080,2115
+            FrameLayout|id_refresh_layout|||1080,359,1080,2115
+             ViewGroup|id_refresh_layout|||1080,359,1080,2115
+              RelativeLayout||||1080,359,1080,359
+               View|sugo_biz_loading|||1578,359,1080,348
+               LinearLayout|srl_classics_center|||1620,359,1080,293
+                TextView|srl_classics_update|'Last Update' M-d HH:mm||1620,359,1080,293
+                TextView|srl_classics_title|Pull Down To Refresh||1620,359,1080,293
+               ImageView|srl_classics_arrow||<Adsız>|1620,359,1080,293
+              FrameLayout|id_refresh_layout|||1080,359,1080,2115
+               RecyclerView||||1080,359,1080,2115
+                ViewGroup||||1080,359,1080,503
+                 LinearLayout|ll_search|||1113,365,1080,475
+                  ImageView||||1146,387,1080,453
+                  EditText|et_search|ID/Takma Ad/Grup Adı ile ara||1234,365,1080,475|c
+            FrameLayout|id_refresh_layout|||2160,359,1080,2115
+             ViewGroup|id_refresh_layout|||2160,359,1080,2115
+              RelativeLayout||||2160,359,1080,359
+               View|sugo_biz_loading|||2658,359,1080,348
+               LinearLayout|srl_classics_center|||2700,359,1080,293
+                TextView|srl_classics_update|'Last Update' M-d HH:mm||2700,359,1080,293
+                TextView|srl_classics_title|Pull Down To Refresh||2700,359,1080,293
+               ImageView|srl_classics_arrow||<Adsız>|2700,359,1080,293
+              FrameLayout|id_refresh_layout|||2160,359,1080,2115
+               RecyclerView||||2160,359,1080,2115
+                ViewGroup||||2160,359,1080,503
+                 LinearLayout|ll_search|||2193,365,1080,475
+                  ImageView||||2226,387,1080,453
+                  EditText|et_search|ID/Takma Ad/Grup Adı ile ara||2314,365,1080,475|c
+        FrameLayout|id_main_home_fragment_me|||1080,0,1080,2115
+         ScrollView|id_nsv|||1080,93,1080,2115
+          LinearLayout||||1080,93,1080,2115
+           FrameLayout|id_me_userinfo_fl|||1080,93,1080,-996|c
+            FrameLayout||||1124,93,1080,-996
+             FrameLayout||||1124,93,1080,-996
+              ImageView|id_user_avatar_iv|||1124,93,1080,-996
+            LinearLayout||||1394,93,1080,-1041
+             LinearLayout||||1394,93,1080,-1115
+              ViewGroup|id_user_name_tv|||1394,93,1080,-1115
+               ImageView|bg_pag_view|||1394,93,1080,-1115
+               TextView|txt_tv|Banysingh||1394,93,1080,-1115
+               ImageView|fore_pag_view|||1394,93,1080,-1115
+             TextView|id_user_intro_tv|Profili görüntüle veya düzenle||1394,93,1080,-1041
+            View|view_me_profile_red_tip|||1995,93,1080,-1104
+            ImageView||||2039,93,1080,-1098
+           ViewGroup||||1080,93,1080,-801
+            LinearLayout|ll_relation_following|||1135,93,1080,-821|c
+             TextView|tv_relation_following|3||1282,93,1080,-860
+             TextView||Takip et||1237,93,1080,-821
+            LinearLayout|ll_relation_friends|||1458,93,1080,-821|c
+             TextView|tv_relation_friends|2||1606,93,1080,-860
+             TextView||Arkadaşlar||1540,93,1080,-821
+            LinearLayout|ll_relation_followers|||1782,93,1080,-821|c
+             TextView|tv_relation_followers|2||1929,93,1080,-860
+             TextView||Takipçiler||1872,93,1080,-821
+           ViewGroup||||1124,93,1080,-374
+            LinearLayout|ll_recharge|||1168,93,1080,-660|c
+             TextView||Yükleme||1168,93,1080,-660
+             TextView|text_first_recharge_tip|‎Ödül‎‎ ‎||1347,93,1080,-664
+             ImageView|iv_coin|||1959,93,1080,-664
+             TextView|id_tv_recharge_coins|0||2009,93,1080,-663
+             ImageView||||2039,93,1080,-670
+            ViewGroup|frame_vip|||1168,93,1080,-418|c
+             TextView|id_vip_title|VIP/SVIP ||1212,93,1080,-515
+             TextView|item_vip_flag|Katıl||1212,93,1080,-462
+             FrameLayout|fl_vip_icon_layers|||1438,93,1080,-426
+              ImageView|iv_vip_icon|||1438,93,1080,-426
+              ImageView|iv_vip_icon_remind|||1438,93,1080,-426
+            ViewGroup|frame_noble|||1631,93,1080,-418|c
+             TextView|id_noble_title|Aristokrasi ||1675,93,1080,-515
+             TextView|item_noble_flag|Aç||1675,93,1080,-462
+             ImageView||||1907,93,1080,-429
+           ViewGroup||||1124,93,1080,54
+            TextView|id_tv_title|Sık kullanılanlar||1168,93,1080,-245
+            GridView|id_rv_functions|||1124,93,1080,26
+             ViewGroup||||1124,93,1080,26|c
+              ImageView|id_fiv_icon|||1177,93,1080,-47
+              TextView|id_function_name|Elmas||1124,93,1080,9
+             ViewGroup||||1372,93,1080,26|c
+              ImageView|id_fiv_icon|||1425,93,1080,-47
+              TextView|tv_count|2||1536,93,1080,-156
+              TextView|id_function_name|Ziyaretçi||1372,93,1080,9
+             ViewGroup||||1620,93,1080,26|c
+              ImageView|id_fiv_icon|||1673,93,1080,-47
+              TextView|id_function_name|Görevler||1620,93,1080,9
+             ViewGroup||||1868,93,1080,26|c
+              ImageView|id_fiv_icon|||1921,93,1080,-47
+              TextView|id_function_name|Grup||1868,93,1080,9
+           ViewGroup|id_item_me_games|||1124,93,1080,465
+            TextView|id_tv_title|Oyunlar||1168,131,1080,183
+            GridView|id_rv_games|||1124,205,1080,437
+             ViewGroup||||1124,205,1080,437|c
+              ImageView|id_fiv_icon|||1182,227,1080,359
+              View|view_red_tip|||1287,221,1080,254
+              TextView|id_function_name|Tahtlar Çatışması: Sefer||1135,381,1080,420
+             ViewGroup||||1372,205,1080,437|c
+              ImageView|id_fiv_icon|||1430,227,1080,359
+              TextView|id_function_name|Araba Kralı||1383,381,1080,420
+             ViewGroup||||1620,205,1080,437|c
+              ImageView|id_fiv_icon|||1678,227,1080,359
+              TextView|id_function_name|LUDO||1631,381,1080,420
+           LinearLayout||||1124,498,1080,2082
+            LinearLayout|ll_me_growing|||1124,520,1080,674|c
+             ImageView||||1168,564,1080,630
+             TextView|id_chat_growing_title|Sohbet Büyümesi||1256,571,1080,623
+             TextView|id_tv_me_growing|8||2053,577,1080,616
+            LinearLayout|id_certification_centre_fl|||1124,674,1080,828|c
+             ImageView||||1168,718,1080,784
+             TextView||Doğrulama merkezi||1256,725,1080,777
+             TextView|id_certification_centre_tips_tv|+100{{diamond}}||1963,730,1080,771
+            LinearLayout|ll_me_anchor|||1124,828,1080,982|c
+             ImageView||||1168,872,1080,938
+             TextView||Ev Sahibi Merkezi||1256,879,1080,931
+             LinearLayout||||1599,885,1080,924
+              TextView|tv_anchor_tips|||2072,885,1080,924
+            LinearLayout|ll_party_center|||1124,982,1080,1136|c
+             ImageView||||1168,1026,1080,1092
+             TextView|tv_party_center_desc|Etkinlik Merkezi||1256,1033,1080,1085
+             View||||1561,1059,1080,1059
+             View|view_party_center_tip|||2050,1048,1080,1070
+            LinearLayout|ll_me_store|||1124,1136,1080,1290|c
+             ImageView||||1168,1180,1080,1246
+             TextView||Mağaza||1256,1187,1080,1239
+             View||||1413,1213,1080,1213
+            LinearLayout|ll_me_equipment|||1124,1290,1080,1444|c
+             ImageView||||1168,1334,1080,1400
+             TextView||Sırt çantası||1256,1341,1080,1393
+             View||||1478,1367,1080,1367
+            LinearLayout|linear_charm_level|||1124,1444,1080,1598|c
+             ImageView||||1168,1488,1080,1554
+             TextView||Seviyem||1256,1495,1080,1547
+             LinearLayout||||1442,1501,1080,1540
+              ImageView|image_charm_level|||1984,1501,1080,1540
+            FrameLayout|fl_invite_entrance|||1124,1598,1080,1752|c
+             ImageView||||1168,1642,1080,1708
+             TextView|inviteTitleTv|SUGO'yu paylaşın||1256,1649,1080,1701
+            FrameLayout|id_online_customer_service|||1124,1752,1080,1906|c
+             ImageView||||1168,1796,1080,1862
+             TextView|tv_online_customer_service|Canlı destek||1256,1803,1080,1855
+            FrameLayout|id_me_settings_fl|||1124,1906,1080,2060|c
+             ImageView||||1168,1950,1080,2016
+             TextView||Ayarlar||1256,1957,1080,2009
+       FrameLayout|id_home_tabs_layout|||0,2115,1080,2400
+        LinearLayout|id_main_bottombar|||0,2115,1080,2400
+         LinearLayout|id_main_bottomtab_home|||0,2115,216,2270|c
+          FrameLayout||||0,2115,216,2231
+           ImageView|id_main_bottomtab_home_iv|||58,2132,157,2231
+          TextView|tv_main_home|Ana sayfa||47,2237,169,2270
+         LinearLayout|id_main_bottomtab_feed|||216,2115,432,2270|c
+          RelativeLayout||||216,2115,432,2231
+           ImageView|id_main_bottomtab_feed_iv|||274,2132,373,2231
+          TextView|tv_main_feed|Anlar||292,2237,356,2270
+         LinearLayout|id_main_bottomtab_audio|||432,2115,648,2270|c
+          RelativeLayout||||432,2115,648,2231
+           ImageView|id_main_bottomtab_audio_iv|||490,2132,589,2231
+          TextView|tv_main_room|Odalar||499,2237,580,2270
+         LinearLayout|id_main_bottomtab_conv|||648,2115,864,2270|c
+          RelativeLayout||||648,2115,864,2231
+           ImageView|id_main_bottomtab_conv_iv|||706,2132,805,2231
+           TextView|id_main_bottomtab_conv_tcv|99+||761,2126,846,2182
+          TextView|tv_main_msg|Mesajlar||703,2237,809,2270
+         LinearLayout|id_main_bottomtab_me|||864,2115,1080,2270|c
+          RelativeLayout||||864,2115,1080,2231
+           ImageView|id_main_bottomtab_me_iv|||922,2132,1021,2231
+           View|id_main_bottomtab_me_tips|||993,2132,1026,2165
+          TextView|tv_main_me|Ben||948,2237,995,2270
+      ImageView|image_main_bg_v2|||0,0,1080,605
+      FrameLayout||||816,1458,1080,1678|c
+       FrameLayout||||816,1458,1080,1678
+        FrameLayout||||816,1458,1080,1678
+         FrameLayout||||816,1458,1080,1678
+          ViewGroup||||838,1458,1058,1678
+           View|topPagView|||838,1458,1058,1678
+           ViewGroup|bottomParentView|||849,1576,1047,1620
+            ViewFlipper|dataFlipper|||860,1582,1036,1615
+             LinearLayout||||913,1582,982,1615
+              ImageView|diamondIconView|||913,1582,946,1615
+              TextView|dataFrame1|x0||952,1582,982,1615
+ View|android:id/navigationBarBackground|||0,2270,1080,2400

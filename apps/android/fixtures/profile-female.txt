@@ -1,0 +1,236 @@
+FrameLayout||||0,0,1080,2400
+ LinearLayout||||0,0,1080,2400
+  FrameLayout||||0,0,1080,2400
+   LinearLayout|action_bar_root|||0,0,1080,2400
+    FrameLayout|android:id/content|||0,0,1080,2400
+     ViewGroup|fitSystemWindowContainer|||0,0,1080,2400
+      ScrollView|coordinator|||0,0,1080,2270
+       LinearLayout|appBarLayout|||0,0,1080,1589
+        LinearLayout|id_profile_header_view|||0,0,1080,1589
+         ScrollView|nsv_header|||0,0,1080,1589
+          LinearLayout||||0,0,1080,1589
+           FrameLayout|pv_profile_avatars_view|||0,0,1080,1264
+            FrameLayout||||0,0,1080,1264
+             FrameLayout||||0,0,1080,1264
+              ViewPager|vp_profile_avatar|||0,0,1080,1264
+               FrameLayout||||0,0,1080,1264
+                ImageView|id_user_avatar_iv|||0,0,1080,1264|c
+               FrameLayout||||1080,0,1080,1264
+                ImageView|id_user_avatar_iv|||1080,0,1080,1264|c
+              View||||0,0,1080,275
+              View||||0,714,1080,1264
+            ViewGroup|cl_parent|||0,994,1080,1264
+             ViewGroup|profile_other_chatting_room_view|||44,994,352,1077|c
+              FrameLayout|roomCoverParentView|||55,1005,116,1066
+               ImageView|roomCoverView|||55,1005,116,1066
+              TextView|roomContentView|Sesli sohbette||122,1019,299,1052
+              ImageView|roomGotoView|||305,1023,330,1048
+             RecyclerView|rv_profile_avatar_list|||0,1110,1080,1220
+              FrameLayout|fl_profile_little_avatar_item|||44,1110,154,1220
+               FrameLayout||||44,1110,154,1220
+                ImageView|iv_profile_little_avatar_item|||44,1110,154,1220|c
+                View|view_stroke|||44,1110,154,1220
+              FrameLayout|fl_profile_little_avatar_item|||178,1110,288,1220
+               FrameLayout||||178,1110,288,1220
+                ImageView|iv_profile_little_avatar_item|||178,1110,288,1220|c
+              FrameLayout|fl_profile_little_avatar_item|||292,1110,402,1220
+               FrameLayout||||292,1110,402,1220
+                ImageView|iv_profile_little_avatar_item|||292,1110,402,1220|c
+              FrameLayout|fl_profile_little_avatar_item|||406,1110,516,1220
+               FrameLayout||||406,1110,516,1220
+                ImageView|iv_profile_little_avatar_item|||406,1110,516,1220|c
+              FrameLayout|fl_profile_little_avatar_item|||520,1110,630,1220
+               FrameLayout||||520,1110,630,1220
+                ImageView|iv_profile_little_avatar_item|||520,1110,630,1220|c
+              FrameLayout|fl_profile_little_avatar_item|||634,1110,744,1220
+               FrameLayout||||634,1110,744,1220
+                ImageView|iv_profile_little_avatar_item|||634,1110,744,1220|c
+              FrameLayout|fl_profile_little_avatar_item|||748,1110,858,1220
+               FrameLayout||||748,1110,858,1220
+                ImageView|iv_profile_little_avatar_item|||748,1110,858,1220|c
+              FrameLayout|fl_profile_little_avatar_item|||862,1110,972,1220
+               FrameLayout||||862,1110,972,1220
+                ImageView|iv_profile_little_avatar_item|||862,1110,972,1220|c
+              FrameLayout|fl_profile_little_avatar_item|||976,1110,1080,1220
+               FrameLayout||||976,1110,1080,1220
+                ImageView|iv_profile_little_avatar_item|||976,1110,1080,1220|c
+           ViewGroup|pv_profile_user_basic_view|||0,1264,1080,1589
+            ViewGroup||||0,1264,1080,1589
+             ViewGroup|basic_info_left|||44,1319,783,1534
+              ViewGroup|nameParentView|||44,1319,783,1393
+               ViewGroup|tv_profile_basic_name|||44,1319,306,1393
+                ImageView|bg_pag_view|||44,1319,306,1393
+                TextView|txt_tv|🖋Mevsim||44,1319,306,1393
+                ImageView|fore_pag_view|||44,1319,306,1393
+               ViewGroup|id_user_certification_view|||312,1331,548,1381|c
+                ImageView|id_certification_icon|||312,1331,362,1381
+                TextView|id_certification_tv|Doğrulandı||336,1331,548,1381
+               ImageView|id_gender_certification_iv|||554,1331,604,1381|c
+               ImageView|id_user_chat_star|||610,1331,660,1381|c
+              ViewGroup|onlineParenView|||44,1404,385,1457
+               View|view_profile_basic_online|||44,1420,66,1442
+               TextView|tv_profile_basic_online|çevrimiçi||83,1404,237,1457
+               View|view_profile_basic_divide|||248,1428,254,1434
+               TextView|tv_profile_basic_distance|344km||265,1404,385,1457
+              ViewGroup|fl_label_flow|||44,1468,783,1534
+               FrameLayout|gv_profile_basic_gender_age|||44,1481,134,1520
+                LinearLayout|id_gender_age_root|||44,1481,134,1520|s
+                 ImageView||||55,1489,77,1511
+                 TextView|id_gender_age_tv|‎‎ ‎‎46‎‎‎ ‎||77,1484,123,1517|s
+               FrameLayout|view_wealth|||140,1481,228,1520
+                FrameLayout||||140,1481,228,1520
+                 ImageView|iv_wealth_bg|||140,1481,228,1520
+                 TextView|tv_wealth_level|7||187,1481,203,1519
+               ImageView|iv_profile_base_charm|||234,1481,322,1520
+               ImageView|iv_profile_basic_vip|||328,1481,452,1520
+               FrameLayout|profile_family_view|||458,1470,726,1531
+                ViewGroup||||458,1470,726,1531
+                 ImageView|family_icon|||461,1473,516,1528
+                 TextView|text_family|‎İmza Events Ajans‎‎ ‎||489,1481,723,1520
+             ViewGroup|basic_info_right|||805,1286,1058,1539
+              ViewGroup|fl_profile_guardian_avatar|||805,1286,1058,1539|c
+               FrameLayout|id_layout_avatar_user|||805,1286,1058,1539
+                ImageView|iv_avatar_user_frame|||805,1286,1058,1539
+                ImageView|iv_avatar_user_frame_def|||805,1286,1058,1539
+                FrameLayout||||854,1335,1008,1489
+                 ImageView|id_avatar_user|||854,1335,1008,1489
+                ImageView|id_avatar_user_def|||854,1335,1008,1489
+       LinearLayout||||0,1589,1080,2270
+        ScrollView|id_profile_scroll_view|||0,1589,1080,1721
+         ViewGroup||||0,1589,1080,1721
+          HorizontalScrollView|id_tab_layout|||0,1589,1080,1710
+           LinearLayout||||0,1589,772,1710
+            TextView|id_profile_tab_userinfo|Profil||0,1589,179,1710|c
+            TextView|id_profile_tab_glory|Onur||179,1589,330,1710|c
+            TextView|id_profile_tab_moments|durum 38||330,1589,574,1710|c
+            TextView|id_profile_tab_relationship_tv|İlişkiler||574,1623,772,1675|c
+        ViewPager|id_view_pager|||0,1721,1080,2270
+         ScrollView|sv_profile_info|||0,1721,1080,2270
+          LinearLayout||||0,1721,1080,2270
+           LinearLayout|room_family_paren_view|||33,1776,1047,1952
+            ViewGroup|ProfileAudioRoomView|||44,1776,529,1952
+             ViewGroup|audio_room_root|||44,1776,529,1952|c
+              ImageView|audioRoomBg|||44,1776,529,1952
+              FrameLayout|clip_profile_audio_room_cover|||66,1798,198,1930
+               ImageView|iv_profile_audio_room_cover|||66,1798,198,1930
+              ViewGroup|rightContentView|||220,1816,507,1912
+               TextView|tv_profile_audio_room_title|Odası||220,1816,320,1862
+               LinearLayout|tagParentView|||220,1879,286,1912
+                LinearLayout|ll_profile_audio_room_num|||220,1879,286,1912
+                 ImageView||||226,1879,259,1912
+                 TextView|tv_profile_audio_room_num|0||259,1879,275,1912
+              ImageView|audioRoomBgTag|||336,1776,529,1952
+            LinearLayout|pv_profile_family_info|||551,1776,1036,1952
+             ViewGroup|ll_family_root|||551,1776,1036,1952|c
+              ImageView|familyBg|||551,1776,1036,1952
+              ImageView|iv_family_icon|||573,1798,705,1930
+              TextView|tv_family_name|Ailesi||727,1816,824,1862
+              ImageView|iv_family_tag|||830,1814,880,1864
+              LinearLayout|tagParentView|||727,1879,1014,1912
+               LinearLayout|profile_family_num_parent|||727,1879,809,1912
+                ImageView||||733,1879,766,1912
+                TextView|profile_family_num|51||766,1879,798,1912
+              ImageView|familyBgTag|||843,1776,1036,1952
+           View|line1|||44,2007,1036,2013
+           ViewGroup|pv_profile_private_photo_view|||0,2068,1080,2270
+            ViewGroup|cl_profile_private_photo|||0,2068,1080,2270|c
+             TextView|tv_profile_private_photo_title|özel albüm||44,2068,259,2127
+             TextView|tv_profile_private_photo_title_num|4||962,2071,984,2124
+             ImageView|iv_arrow|||995,2081,1028,2114
+             RecyclerView|rv_profile_private_photo_list|||0,2160,1080,2270
+              FrameLayout|fl_profile_little_avatar_item|||44,2160,198,2270
+               FrameLayout||||44,2160,198,2270
+                ImageView|iv_profile_little_avatar_item|||44,2160,198,2270|c
+              FrameLayout|fl_profile_little_avatar_item|||208,2160,362,2270
+               FrameLayout||||208,2160,362,2270
+                ImageView|iv_profile_little_avatar_item|||208,2160,362,2270|c
+              FrameLayout|fl_profile_little_avatar_item|||372,2160,526,2270
+               FrameLayout||||372,2160,526,2270
+                ImageView|iv_profile_little_avatar_item|||372,2160,526,2270|c
+              FrameLayout|fl_profile_little_avatar_item|||536,2160,690,2270
+               FrameLayout||||536,2160,690,2270
+                ImageView|iv_profile_little_avatar_item|||536,2160,690,2270|c
+           View|line2|||44,2369,1036,2270
+           ViewGroup|pv_profile_personal_tag|||0,2430,1080,2270|c
+            TextView|tv_personal_tag_title|Profil Etiketleri||44,2430,329,2270
+            FrameLayout|fl_personal_tag_container|||44,2515,1036,2270
+             ViewGroup|fl_personal_tag_list|||44,2515,1036,2270
+              LinearLayout||||44,2515,276,2270
+               TextView|tv_personal_tag_text|🧠 Mantıklı||77,2534,243,2270
+              LinearLayout||||293,2515,532,2270
+               TextView|tv_personal_tag_text|⏳ Disiplinli||326,2534,499,2270
+              LinearLayout||||549,2515,808,2270
+               TextView|tv_personal_tag_text|🛡️ Özgüvenli||582,2534,775,2270
+              LinearLayout||||825,2515,1027,2270
+               TextView|tv_personal_tag_text|🌙 Yalnız||858,2534,994,2270
+              LinearLayout||||44,2609,254,2270
+               TextView|tv_personal_tag_text|💼 İşkolik||77,2628,221,2270
+              LinearLayout||||271,2609,570,2270
+               TextView|tv_personal_tag_text|📞 Sesli Sohbet||304,2628,537,2270
+              LinearLayout||||587,2609,929,2270
+               TextView|tv_personal_tag_text|🎤 Şarkı Söylemek||620,2628,896,2270
+              LinearLayout||||44,2703,218,2270
+               TextView|tv_personal_tag_text|🎶 Pop||77,2722,185,2270
+              LinearLayout||||235,2703,453,2270
+               TextView|tv_personal_tag_text|🐱 Kediler||268,2722,420,2270
+              LinearLayout||||470,2703,676,2270
+               TextView|tv_personal_tag_text|☕ Kahve||503,2722,643,2270
+           View|line_personal_tag|||44,2835,1036,2270
+           ViewGroup|pv_profile_extend_info|||0,2896,1080,2270
+            LinearLayout|cl_profile_extend_info|||0,2896,1080,2270
+             TextView|tv_profile_extend_info_title|Bilgi||44,2896,129,2270
+             LinearLayout|user_information_view|||44,2988,1036,2270
+              LinearLayout|uid_root|||44,2988,1036,2270|c
+               ImageView||||44,3021,110,2270
+               TextView||ID||132,3031,169,2270
+               TextView|uidView|100000002||180,3031,378,2270
+               ImageView|copyView|||384,3026,439,2270
+              LinearLayout|height_root|||44,3120,1036,2270
+               ImageView||||44,3153,110,2270
+               TextView|heightContentView|Boy 157cm||132,3163,326,2270
+              LinearLayout|weight_root|||44,3252,1036,2270
+               ImageView||||44,3285,110,2270
+               TextView|weightContentView|Ağırlık 55kg||132,3295,337,2270
+              LinearLayout|industry_root|||44,3384,1036,2270
+               ImageView||||44,3417,110,2270
+               TextView|industryContentView|Alan özel||132,3427,290,2270
+              LinearLayout|profession_root|||44,3516,1036,2270
+               ImageView||||44,3549,110,2270
+               TextView|professionContentView|Meslek hemşire||132,3559,406,2270
+              LinearLayout|habitation_root|||44,3648,1036,2270
+               ImageView||||44,3681,110,2270
+               TextView|habitationContentView|Mevcut konumlar Azerbaijan||132,3691,626,2270
+              LinearLayout|birthday_root|||44,3780,1036,2270
+               ImageView||||44,3813,110,2270
+               TextView|birthdayContentView|Doğum günü 03/03||132,3823,470,2270
+              LinearLayout|constellation_root|||44,3912,1036,2270
+               ImageView||||44,3945,110,2270
+               TextView|constellationContentView|Burçlar balık||132,3955,346,2270
+              LinearLayout|registration_time_root|||44,4044,1036,2270
+               ImageView||||44,4077,110,2270
+               TextView|registrationTimeContentView|Kayıt zamanı 2026/09/21||132,4087,573,2270
+         ScrollView|gloryVerticalScroll|||1080,1721,1080,2270
+          LinearLayout|wallsContainer|||1080,1721,1080,2051
+           LinearLayout|gloryRowTop|||1124,1754,1080,1754
+           LinearLayout|gloryRowBottom|||1124,1776,1080,1776
+      FrameLayout|id_title_container_fl|||0,0,1080,214
+       ViewGroup|titleBarParentView|||0,93,1080,214
+        ImageView|backBtn|||28,104,127,203|c
+        LinearLayout|titleParentView|||174,115,763,192
+         FrameLayout||||313,115,390,192
+          ImageView|titleAvatarView|||313,115,390,192
+         TextView|titleView|🖋Mevsim||412,127,623,179
+        ImageView|shareProfile|||810,104,909,203|c
+        ImageView|editOrMoreBtn|||953,104,1052,203|c
+      ViewGroup|pv_profile_button_view|||0,1940,1080,2270
+       ViewGroup|bottomBtnRoot|||0,1940,1080,2270
+        ViewGroup|bottomBtnParent|||22,2061,1058,2215|c
+         FrameLayout||||22,2061,1058,2215
+          ViewGroup||||22,2061,1058,2215
+           ImageView|videoBtn|||44,2061,198,2215|c
+           ImageView|followBtn|||220,2061,374,2215|c
+           ImageView|chatBtn|||396,2061,550,2215|c
+           LinearLayout|pickBtn|||572,2061,1036,2215|c
+            ImageView||||647,2105,713,2171
+            TextView||Merhaba de||724,2112,961,2164
+ View|android:id/navigationBarBackground|||0,2270,1080,2400

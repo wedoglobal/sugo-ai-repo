@@ -1,0 +1,46 @@
+FrameLayout||||0,0,1080,2400
+ LinearLayout||||0,0,1080,2400
+  FrameLayout||||0,0,1080,2400
+   LinearLayout|action_bar_root|||0,0,1080,2400
+    FrameLayout|android:id/content|||0,0,1080,2400
+     ViewGroup||||0,0,1080,2400
+      LinearLayout|ll_toolbar|||0,110,1080,231
+       ImageView|id_back|||44,137,110,203|c
+       TextView||Sohbet Ayarları||44,141,1036,199
+      ScrollView||||0,231,1080,2270
+       LinearLayout||||0,231,1080,2270
+        LinearLayout|ll_avatar|||44,248,1036,479|c
+         ImageView|iv_setting_avatar|||77,281,242,446
+         LinearLayout||||275,281,937,446
+          TextView|tv_setting_name|✨⃝⃟🔥kaplan||275,340,489,386
+         ImageView||||970,347,1003,380
+        LinearLayout||||44,534,1036,842
+         LinearLayout||||77,534,1003,688
+          LinearLayout|ll_note|||77,534,1003,688|c
+           TextView||Açıklama ayarla||77,588,937,634
+           ImageView||||970,594,1003,627
+         LinearLayout||||77,688,1003,842
+          LinearLayout|ll_describe|||77,688,1003,842|c
+           TextView||Açıklama||77,742,937,788
+           ImageView||||970,748,1003,781
+        LinearLayout||||44,897,1036,1513
+         LinearLayout|ll_set_chat_bg|||77,897,1003,1051|c
+          TextView||Sohbet arka plan ayarı||77,951,937,997
+          ImageView||||970,957,1003,990
+         LinearLayout|ll_set_top|||77,1051,1003,1205|c
+          TextView||Tepe||77,1105,828,1151
+          ImageView|sc_set_top|||861,1081,1003,1174|c
+         LinearLayout|ll_back_list|||77,1205,1003,1359|c
+          TextView||engelle||77,1259,828,1305
+          ImageView|sc_set_black|||861,1235,1003,1328|c
+         LinearLayout|ll_complaint|||77,1359,1003,1513|c
+          TextView||Kullanıcıyı bildir||77,1413,937,1459
+          ImageView||||970,1419,1003,1452
+        LinearLayout|ll_delete_history|||44,1568,1036,1722|c
+         TextView||Sohbet geçmişini sil||77,1622,937,1668
+         ImageView||||970,1628,1003,1661
+      ViewGroup||||0,1984,1080,2270
+       View|view_top|||0,1984,1080,2127
+       View||||0,2127,1080,2270
+       TextView|tv_setting_follow|Takip et||44,2072,1036,2226|c
+ View|android:id/navigationBarBackground|||0,2270,1080,2400

@@ -46,7 +46,7 @@
       "matches": [
         "http://localhost/*",
         "http://127.0.0.1/*",
-        "https://sugo-host.b-erdincozer.workers.dev/*"
+        "https://studio.elseweb.lol/*"
       ],
       "js": [
         "network-bridge.js"
