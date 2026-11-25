@@ -41,7 +41,7 @@ function rowSignature(row) {
 }
 
 /** Sohbet: gelen/giden metinler sırayla. Yön, mesaj satırındaki avatarın ekranın hangi yarısında olduğundan bulunur (giden = sağ). */
-function chatMessages(root, size) {
+function chatMessageRows(root, size) {
   var texts = tree.findAll(root, function (n) { return n.id === ID.msgText && tree.isVisible(n, size.width); });
   var messages = [];
   for (var i = 0; i < texts.length; i++) {
@@ -50,10 +50,17 @@ function chatMessages(root, size) {
     while (row.parent && !(avatar = tree.findById(row, ID.itemAvatar))) row = row.parent;
     var dir = avatar ? (tree.centerX(avatar) > size.width / 2 ? 'out' : 'in') : (tree.centerX(texts[i]) > size.width / 2 ? 'out' : 'in');
     var text = String(texts[i].text || '').trim();
-    if (text) messages.push({ dir: dir, text: text, ts: '', diamonds: 0, top: texts[i].t });
+    var state = dir === 'out' && avatar ? tree.visibleById(row, ID.msgState, size.width) : null;
+    var failed = state && (state.clickable || /başarısız|gönderilemedi|yeniden gönder|failed|resend|^!$/i.test(String(state.desc || state.text || '')));
+    if (text) messages.push({ dir: dir, text: text, status: failed ? 'failed' : state ? 'pending' : 'visible', top: texts[i].t });
   }
   messages.sort(function (a, b) { return a.top - b.top; });
-  return messages.map(function (m) { return { dir: m.dir, text: m.text, ts: m.ts, diamonds: m.diamonds }; });
+  return messages;
+}
+
+function chatMessages(root, size) {
+  return chatMessageRows(root, size).filter(function (m) { return m.status === 'visible'; })
+    .map(function (m) { return { dir: m.dir, text: m.text, ts: '', diamonds: 0 }; });
 }
 
 /** Sistem ipuçları ("harika bir eşleşme" vb.) ayrı okunur; mesaj sayılmaz. */
@@ -84,4 +91,4 @@ function gender(root, size) {
   return badge.selected ? 'female' : 'male';
 }
 
-module.exports = { gender: gender, chatRows: chatRows, rowSignature: rowSignature, chatMessages: chatMessages, systemTips: systemTips, chatTitle: chatTitle, profileId: profileId };
+module.exports = { gender: gender, chatRows: chatRows, rowSignature: rowSignature, chatMessages: chatMessages, chatMessageRows: chatMessageRows, systemTips: systemTips, chatTitle: chatTitle, profileId: profileId };

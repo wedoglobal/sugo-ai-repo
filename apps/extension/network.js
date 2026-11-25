@@ -4,16 +4,20 @@ const read = async () => (await chrome.storage.local.get(NETWORK_KEY))[NETWORK_K
 const own = new Set();
 const suppressed = new Set();
 const tabDomains = new Map();
+const appliedRoam = new Map();
+const roamKey = (domain) => `gpsRoam:${domain}`;
+const sameCenter = (gps, center) => gps.enabled && gps.latitude === center.latitude && gps.longitude === center.longitude;
 let queue = Promise.resolve();
 const serial = (fn) => { const task = queue.then(fn); queue = task.catch(() => {}); return task; };
 async function statusError(key, message) {
   await chrome.storage.session.set({ [key]: message });
 }
-async function gpsTab(tab, profiles) {
+async function gpsTab(tab, state, move) {
   if (!tab.id) return;
   const target = { tabId: tab.id };
-  const p = profiles.find((p) => p.domain === domainOf(tab.url ?? '') && p.gps.enabled);
+  const p = activeProfiles(state).find((p) => p.domain === domainOf(tab.url ?? '') && p.gps.enabled);
   if (!p) {
+    appliedRoam.delete(tab.id);
     suppressed.delete(tab.id);
     tabDomains.delete(tab.id);
     if (own.delete(tab.id)) {
@@ -23,10 +27,20 @@ async function gpsTab(tab, profiles) {
     return;
   }
   if (suppressed.has(tab.id)) return `${p.domain}: GPS bağlantısı kesildi; panelden yeniden uygulayın.`;
+  const key = roamKey(p.domain);
+  const saved = (await chrome.storage.session.get(key))[key];
+  const hold = saved?.host === state.activeHost && sameCenter(p.gps, saved.center) ? saved : null;
+  if (move && (!sameCenter(p.gps, move.center) || (hold && hold.stepAt > move.stepAt))) return 'Konum hedefi güncel değil.';
+  const point = move ?? hold;
+  if (move && appliedRoam.get(tab.id) === hold?.stepAt && hold?.stepAt === move.stepAt) return;
   try {
     if (!own.has(tab.id)) { await chrome.debugger.attach(target, '1.3'); own.add(tab.id); }
     tabDomains.set(tab.id, p.domain);
-    await chrome.debugger.sendCommand(target, 'Emulation.setGeolocationOverride', { latitude: p.gps.latitude, longitude: p.gps.longitude, accuracy: p.gps.accuracy });
+    const { latitude, longitude } = point ?? p.gps;
+    await chrome.debugger.sendCommand(target, 'Emulation.setGeolocationOverride', { latitude, longitude, accuracy: p.gps.accuracy });
+    if (move && hold?.stepAt !== move.stepAt) await chrome.storage.session.set({ [key]: { ...move, host: state.activeHost } });
+    if (point) appliedRoam.set(tab.id, point.stepAt);
+    else appliedRoam.delete(tab.id);
     await statusError(`gps:${tab.id}`, '');
   } catch (e) { await statusError(`gps:${tab.id}`, e.message); return `${p.domain}: Sekme ${tab.id}: ${e.message}`; }
 }
@@ -55,9 +69,23 @@ async function apply(state) {
   } else if (current.levelOfControl === 'controlled_by_this_extension') await chrome.proxy.settings.clear({ scope: 'regular' });
   const domains = profiles.filter((p) => p.gps.enabled).map((p) => p.domain);
   await locationPermissions(profiles, domains);
-  const errors = (await Promise.all((await chrome.tabs.query({})).map((tab) => gpsTab(tab, profiles)))).filter(Boolean);
+  const errors = (await Promise.all((await chrome.tabs.query({})).map((tab) => gpsTab(tab, state)))).filter(Boolean);
   await locationPermissions(profiles, domains.filter((domain) => errors.some((e) => e.startsWith(`${domain}:`))));
   return errors;
+}
+
+export function applyRoam(tabId, domain, host, move, expiresAt) {
+  return serial(async () => {
+    const { hostSugoId } = await chrome.storage.local.get('hostSugoId');
+    if (String(hostSugoId) !== String(host.sugoId)) return false;
+    const tab = await chrome.tabs.get(tabId);
+    const url = new URL(tab.url);
+    const state = await read();
+    const profile = activeProfiles(state).find((p) => p.domain === domain);
+    if (Date.now() > expiresAt || state.activeHost !== host.id || url.hostname !== domain ||
+        !url.pathname.startsWith('/messages') || !profile || !sameCenter(profile.gps, move.center)) return false;
+    return !(await gpsTab(tab, state, move));
+  });
 }
 async function snapshot(host) {
   const state = await read();
@@ -100,16 +128,23 @@ export async function networkMessage(msg) {
       }
     }
     catch (e) { await chrome.storage.local.set({ [NETWORK_KEY]: previous }); await apply(previous).catch(() => {}); throw e; }
+    for (const p of activeProfiles(previous)) {
+      const current = activeProfiles(state).find((x) => x.domain === p.domain);
+      if (state.activeHost !== previous.activeHost || !current || !sameCenter(current.gps, p.gps)) {
+        await chrome.storage.session.remove(roamKey(p.domain));
+      }
+    }
     await chrome.storage.session.set({ networkReceipt: { host: msg.host, revision: crypto.randomUUID(), status: errors.length ? 'error' : applied ? 'applied' : 'saved', errors, checkedAt: new Date().toISOString() } });
     return snapshot(msg.host);
   });
 }
 chrome.tabs.onUpdated.addListener((id, change, tab) => {
-  if (change.url || change.status === 'loading') serial(async () => gpsTab(tab, activeProfiles(await read()))).catch(() => {});
+  if (change.url || change.status === 'loading') serial(async () => gpsTab(tab, await read())).catch(() => {});
 });
-chrome.tabs.onRemoved.addListener((id) => { own.delete(id); tabDomains.delete(id); suppressed.delete(id); chrome.storage.session.remove(`gps:${id}`); });
+chrome.tabs.onRemoved.addListener((id) => { own.delete(id); tabDomains.delete(id); appliedRoam.delete(id); suppressed.delete(id); chrome.storage.session.remove(`gps:${id}`); });
 chrome.debugger.onDetach.addListener(({ tabId }, reason) => {
   if (own.delete(tabId)) {
+    appliedRoam.delete(tabId);
     const domain = tabDomains.get(tabId);
     if (domain) for (const scheme of ['http', 'https']) {
       const pattern = `${scheme}://${domain}/*`;

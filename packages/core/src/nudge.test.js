@@ -13,7 +13,7 @@ describe('fotoğrafla dürtme', () => {
       const query = {
         select() { return query; },
         eq(key, val) { filters[key] = val; return query; },
-        in() { return query; }, neq() { return query; }, gt() { return query; }, lt() { return query; },
+        in() { return query; }, or() { return query; }, gt() { return query; }, lt() { return query; },
         limit() { return query; }, order() { return query; }, is() { return query; }, like() { return query; }, single() { return query; },
         update(val) { action = 'update'; value = val; return query; },
         insert(val) { action = 'insert'; value = val; return query; },

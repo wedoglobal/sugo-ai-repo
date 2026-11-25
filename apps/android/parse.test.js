@@ -36,8 +36,9 @@ describe('sohbet listesi', () => {
 
 describe('sohbet ekranı', () => {
   const root = load('chat');
-  it('gelen/giden yönü avatar konumundan çıkarır', () => {
-    expect(parse.chatMessages(root, size)).toEqual([{ dir: 'out', text: 'Ne yiyeceğimi bilmiyorum. Bir şey tavsiye edebilir misin?', ts: '', diamonds: 0 }]);
+  it('tıklanabilir hata simgesi olan giden balonu geçmişe katmaz', () => {
+    expect(parse.chatMessageRows(root, size)).toEqual([expect.objectContaining({ dir: 'out', status: 'failed' })]);
+    expect(parse.chatMessages(root, size)).toEqual([]);
   });
   it('boş eşleşme sohbetinde mesaj yok, sistem ipucu var', () => {
     const empty = load('chat-empty-match');

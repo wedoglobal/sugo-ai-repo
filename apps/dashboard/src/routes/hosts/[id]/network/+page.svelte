@@ -12,7 +12,7 @@
   let error = $state('');
   let showPassword = $state(false);
   const active = $derived(!!state);
-  /** Profiller sunucuda tutulur; bu host'a bağlı Chrome eklentisi bunları kendi kontrol okumasında alıp uygular. */
+  /** Bağlı istemciler kaydedilen profilleri kontrol yanıtından okur. */
   async function api(options) {
     const response = await fetch(`/hosts/${data.host.id}/network-profiles`, { cache: 'no-store', ...options });
     const body = await response.json().catch(() => ({}));
@@ -29,7 +29,7 @@
         let list = (state?.profiles ?? []).filter((p) => p.domain !== extra.originalDomain && p.domain !== extra.domain);
         if (action === 'save') list = [...list, extra.profile];
         adopt(await api({ method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ profiles: list }) }));
-        message = state.connected ? 'Kaydedildi. Bağlı Chrome ayarı birkaç saniye içinde uygular.' : 'Kaydedildi. Eklentinin bağlı olduğu Chrome açılınca ayar uygulanır.';
+        message = 'Ayar kaydedildi.';
       }
     } catch (e) { error = e.message; }
     finally { busy = false; }
@@ -48,10 +48,10 @@
 <svelte:head><title>Konum ve bağlantı · {data.host.name || 'AI profili'} · Velora AI</title></svelte:head>
 <div class="network-page">
   <a class="back" href="/hosts/{data.host.id}">← {data.host.name || 'AI profili'} / Profil ayarları</a>
-  <header><div><div class="eyebrow">CONNECTION STUDIO</div><h1>Konum ve bağlantı<span>.</span></h1><p>Bir site seç, konumunu belirle, bağlantını yönet.</p></div><span class:connected={state?.connected} class="connection"><i></i>{state?.connected ? 'Eklenti bağlı' : 'Eklenti bekleniyor'}</span></header>
+  <header><div><div class="eyebrow">CONNECTION STUDIO</div><h1>Konum ve bağlantı<span>.</span></h1><p>Bir site seç, konumunu belirle, bağlantını yönet.</p></div><span class:connected={state?.connected} class="connection"><i></i>{state?.connected ? 'İstemci bağlı' : 'İstemci bekleniyor'}</span></header>
   <div class="card"><ProfileControl host={data.host} /></div>
   <details class="setup-guide" open={!state}><summary class="setup-summary"><span>✧ Velora AI kurulumu</span><span>{state ? 'Bağlantı hazır · Rehberi aç' : '3 kolay adım'}</span></summary><div class="setup-intro"><span class="guide-kicker">İLK KEZ Mİ KULLANIYORSUN?</span><h2>Üç adımda hazır.</h2><p>Otomasyon, GPS ve proxy tek Velora AI eklentisinde. GPS ve proxy kullanmak için 0.2.0 veya üstüne geç; eski sürümler otomasyona devam eder.</p></div><div class="setup-steps"><div><span class="step-number">01</span><strong>Velora AI’ı ekle</strong><p>ZIP’i çıkart ve Chrome’da paketlenmemiş eklenti olarak yükle.</p><a href="/downloads/velora-ai-extension.zip" download>Velora AI’ı indir ↗</a></div><div><span class="step-number">02</span><strong>Siteyi hazırla</strong><p>Domain’i gir. Haritadan konumunu seç veya proxy bilgilerini ekle.</p><button type="button" class="guide-button" disabled={busy} onclick={() => run('read')}>Eklenti bağlantısını kontrol et ↻</button></div><div><span class="step-number">03</span><strong>Kaydet ve etkinleştir</strong><p>Siteyi kaydet; bu profilin bağlantı ayarlarını üstteki düğmeden etkinleştir.</p><span class="step-note">GPS ve proxy ayrı ayrı çalışır.</span></div></div></details>
-  {#if state}<p class="hint" role="status">{state.connected ? `Eklenti bağlı · son okuma ${new Date(state.lastSeenAt).toLocaleTimeString('tr-TR')}` : 'Bu profile bağlı eklenti şu an yanıt vermiyor; kaydettiğiniz ayarlar eklenti açılınca uygulanır.'}</p>{/if}
+  {#if state}<p class="hint" role="status">{state.connected ? `İstemci bağlı · son okuma ${new Date(state.lastSeenAt).toLocaleTimeString('tr-TR')}` : 'Bu profile bağlı istemciden son 90 saniyede kontrol isteği alınmadı.'}</p>{/if}
   {#if error}<div class="notice error" role="alert">{error} <button class="secondary" disabled={busy} onclick={() => run('read')}>Yeniden bağlan</button></div>{/if}
   {#if message}<div class="notice success" role="status">{message}</div>{/if}
   <div class="mode-explainer"><div><span class="mode-symbol gps">◎</span><div><strong>GPS = siteye gösterilen konum</strong><p>IP adresini değiştirmez. Haritadan istediğin noktayı seç.</p></div></div><div><span class="mode-symbol proxy">⇄</span><div><strong>Proxy = bağlantının çıkış adresi</strong><p>GPS’i değiştirmez. Aynı domain’in tüm sekmelerinde çalışır.</p></div></div></div>
@@ -62,7 +62,7 @@
       {#each state?.profiles ?? [] as profile (profile.domain)}
         <button class="profile" class:selected={originalDomain === profile.domain} onclick={() => edit(profile)}><strong>{profile.domain}</strong><small><span class:on={profile.gps.enabled}>● GPS</span><span class:on={profile.proxy.enabled}>● Proxy</span></small></button>
       {:else}<p class="empty">Henüz site eklenmedi.<br />İlk profilinizi sağdan oluşturun.</p>{/each}
-      <div class="privacy"><strong>↳ Sunucuda saklanır</strong><p>Profiller ve proxy şifreleri panel veritabanında tutulur ve yalnız bağlı eklentiye iletilir.</p></div>
+      <div class="privacy"><strong>↳ Sunucuda saklanır</strong><p>Profiller ve proxy şifreleri panel veritabanında tutulur ve bağlı istemcilere iletilir.</p></div>
     </aside>
     <form onsubmit={(e) => { e.preventDefault(); run('save', { profile: $state.snapshot(draft), originalDomain }).then(() => { if (!error) originalDomain = new URL(draft.domain.includes('://') ? draft.domain : `https://${draft.domain}`).hostname.toLowerCase().replace(/\.$/, ''); }); }}>
       <section class="editor-top"><div class="eyebrow">{originalDomain ? 'PROFİLİ DÜZENLE' : 'YENİ PROFİL'}</div><label for="domain">Web sitesi</label><input id="domain" class="domain" bind:value={draft.domain} required placeholder="ör. example.com" /><p class="hint">Tam domain eşleşir. www ve diğer alt domain’ler için ayrı profil ekleyin.</p></section>
@@ -71,6 +71,7 @@
         <LocationMap bind:latitude={draft.gps.latitude} bind:longitude={draft.gps.longitude} />
         <div class="coordinates"><label>Enlem<input type="number" min="-90" max="90" step="any" required bind:value={draft.gps.latitude} /></label><label>Boylam<input type="number" min="-180" max="180" step="any" required bind:value={draft.gps.longitude} /></label><label>Doğruluk (m)<input type="number" min="0" step="any" required bind:value={draft.gps.accuracy} /></label></div>
         <p class="hint">Haritaya tıklayarak seçin, sürükleyerek gezinin. Harita için internet gerekir (OpenStreetMap). GPS açıkken bu sitenin konum iznini eklenti uygular. Kapatılıp kaydedildiğinde gerçek konuma ve önceki Chrome izin davranışına dönülür.</p>
+        <p class="hint">Android, bu profilin <strong>sugo.live</strong> GPS ayarını kullanır. APK’yı Android geliştirici seçeneklerinde Sahte konum uygulaması olarak seçin. Ayarın cihazda uygulandığını Android günlüğünden kontrol edin.</p>
       </section>
       <section><div class="section-heading"><div class="icon">⇄</div><div><h2>IPv4 proxy</h2><p>Bu domain’in ağ bağlantısını yönlendirin.</p></div><label class="toggle"><input type="checkbox" aria-label="IPv4 proxy etkin" bind:checked={draft.proxy.enabled} /><span></span><b>{draft.proxy.enabled ? 'Açık' : 'Kapalı'}</b></label></div>
         <fieldset disabled={!draft.proxy.enabled}><div class="proxy-fields"><label>Protokol<select bind:value={draft.proxy.protocol}><option value="http">HTTP</option><option value="https">HTTPS (TLS)</option><option value="socks5">SOCKS5</option></select></label><label>IPv4 adresi<input placeholder="203.0.113.10" bind:value={draft.proxy.ip} required={draft.proxy.enabled} /></label><label>Port<input type="number" min="1" max="65535" bind:value={draft.proxy.port} required={draft.proxy.enabled} /></label></div>

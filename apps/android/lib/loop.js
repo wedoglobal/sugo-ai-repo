@@ -4,6 +4,7 @@ var S = require('./screens');
 var P = require('./parse');
 var nav = require('./nav');
 var PE = require('./peers');
+var tree = require('./tree');
 var ID = S.ID;
 
 var HANDLED_RETRY_MS = 60 * 1000;
@@ -16,6 +17,9 @@ function createLoop(d) {
   var greeted = {};   // peerId -> zaman
   var retryAt = {};   // ad -> bu zamandan önce açma
   var skipped = {};   // peerId -> true (kadın/engelli)
+  var deliveryKey = 'android-delivery:' + (d.hostId || '');
+  var deliveries = d.store.get(deliveryKey) || {};
+  var deliveryRetryAt = {};
   var scan = { active: false, atBottom: false, lastFullAt: -1e12 };
 
   function snap() { return ui.snapshot(); }
@@ -74,50 +78,123 @@ function createLoop(d) {
     api.state({ state: state, detail: detail || '', lastActivityAt: d.now() });
   }
 
-  /** Metni yazıp gönderir; giden mesaj sayısının arttığı doğrulanmadan başarılı sayılmaz. */
-  function typeAndSend(text) {
+  function saveDelivery(peer, receipt) {
+    var next = Object.assign({}, deliveries);
+    if (receipt) next[peer] = receipt;
+    else delete next[peer];
+    d.store.set(deliveryKey, next);
+    deliveries = next;
+  }
+
+  /** Tıklama sonucu sunucuya ulaşana kadar aynı kişiye yeni iş alınmaz. */
+  function reportDelivery(peer) {
+    var receipt = deliveries[peer];
+    if (!receipt || d.now() < (deliveryRetryAt[peer] || 0)) return;
+    try {
+      if (receipt.sent) api.complete(receipt.id);
+      else api.fail(receipt.id, receipt.error, receipt.stop);
+      saveDelivery(peer, null);
+      delete deliveryRetryAt[peer];
+    } catch (error) {
+      deliveryRetryAt[peer] = d.now() + RETRY_AFTER_ERROR_MS;
+      log('gönderim sonucu tekrar bildirilecek: ' + error.message);
+    }
+  }
+
+  function chatRowsFor(s, name) {
+    if (P.chatTitle(s.root, s.size) !== name) throw new Error('android: hedef sohbet doğrulanamadı');
+    return P.chatMessageRows(s.root, s.size);
+  }
+
+  function assertUnanswered(job, rows) {
+    if (job.kind !== 'reply') return;
+    var last = rows[rows.length - 1];
+    if (!last || last.dir !== 'out' || last.text !== String(job.text).trim()) return;
+    if (last.status === 'failed') throw new Error('sugo filtresi mesajları reddetti: Android ünlem işareti');
+    if (last.status === 'pending') throw new Error('android: önceki gönderimin sonucu belirsiz');
+    throw new Error('android: yanıt zaten sohbette görünüyor');
+  }
+
+  function matchingOut(rows, text) {
+    return rows.filter(function (m) { return m.dir === 'out' && m.text === text; });
+  }
+
+  /** Yalnız hedef metnin yeni balonu ve durum simgesi üzerinden gönderimi doğrular. */
+  function typeAndSend(job, name, peer) {
     if (!api.control(true).active) throw new Error('Profil panelden durduruldu.');
+    var text = String(job.text || '').trim();
+    if (!text) throw new Error('android: boş gönderim metni');
     var s0 = snap();
-    var input = require('./tree').visibleById(s0.root, ID.chatInput, s0.size.width);
-    if (!input) throw new Error('mesaj kutusu bulunamadı');
-    var before = P.chatMessages(s0.root, s0.size).filter(function (m) { return m.dir === 'out'; }).length;
-    // Girişe dokun, klavyenin açılmasını (odak veya giriş kutusunun yukarı kayması) bekle, sonra yaz.
+    assertUnanswered(job, chatRowsFor(s0, name));
+    var input = tree.visibleById(s0.root, ID.chatInput, s0.size.width);
+    if (!input) throw new Error('android: mesaj kutusu bulunamadı');
     ui.click(input);
     var kbEnd = d.now() + 3000;
-    var focusedInput = null;
+    var focusedInput;
     for (;;) {
       var sk = snap();
-      focusedInput = require('./tree').visibleById(sk.root, ID.chatInput, sk.size.width);
+      focusedInput = tree.visibleById(sk.root, ID.chatInput, sk.size.width);
       if (focusedInput && (focusedInput.focused || focusedInput.t < input.t)) break;
-      if (d.now() >= kbEnd) throw new Error('klavye açılmadı');
+      if (d.now() >= kbEnd) throw new Error('android: klavye açılmadı');
       ui.sleep(150);
     }
     ui.sleep(150);
     ui.setText(focusedInput, text);
     ui.sleep(150);
     var s1 = snap();
-    var btn = require('./tree').visibleById(s1.root, ID.chatSend, s1.size.width);
-    if (!btn) throw new Error('gönder düğmesi bulunamadı');
+    if (!tree.visibleById(s1.root, ID.chatSend, s1.size.width)) throw new Error('android: gönder düğmesi bulunamadı');
     if (!api.control(true).active) throw new Error('Profil panelden durduruldu.');
-    ui.click(btn);
-    var end = d.now() + 5000;
+    saveDelivery(peer, { id: job.id, error: 'android: teslim belirsiz', stop: true });
+    if (!api.beginDelivery(job.id)) { saveDelivery(peer, null); return false; }
+
+    var ready = snap();
+    var before = chatRowsFor(ready, name);
+    assertUnanswered(job, before);
+    var button = tree.visibleById(ready.root, ID.chatSend, ready.size.width);
+    if (!button) throw new Error('android: gönder düğmesi bulunamadı');
+    var countBefore = matchingOut(before, text).length;
+    var tail = before[before.length - 1];
+    ui.click(button);
+    var end = d.now() + 6000;
+    var visibleSince = null;
     for (;;) {
-      var s2 = snap();
-      var n = P.chatMessages(s2.root, s2.size).filter(function (m) { return m.dir === 'out'; }).length;
-      if (n > before) return true;
-      if (d.now() >= end) throw new Error('mesaj gönderilemedi (giden mesaj sayısı artmadı)');
+      var after = chatRowsFor(snap(), name);
+      var matches = matchingOut(after, text);
+      var candidate = matches[matches.length - 1];
+      var previous = candidate && after[after.indexOf(candidate) - 1];
+      var appended = candidate && (matches.length > countBefore || (previous && tail
+        && previous.dir === tail.dir && previous.text === tail.text && (tail.dir !== 'out' || tail.text !== text)));
+      if (appended && candidate.status === 'failed') throw new Error('sugo filtresi mesajları reddetti: Android ünlem işareti');
+      if (appended && candidate.status === 'visible') {
+        if (visibleSince === null) visibleSince = d.now();
+        if (d.now() - visibleSince >= 1200) return true;
+      } else visibleSince = null;
+      if (d.now() >= end) throw new Error('android: tıklama sonrası teslim doğrulanamadı');
       ui.sleep(120);
     }
   }
 
-  /** Açık sohbette işi gönderir ve sunucuya bildirir. */
-  function sendJob(job) {
-    if (job.sendText === false) { api.fail(job.id, 'android: medya gönderilemiyor'); return false; }
-    try { typeAndSend(job.text); }
-    catch (e) { api.fail(job.id, e.message); throw e; }
-    api.complete(job.id);
-    log('gönderildi ' + job.peerSugoId + ': ' + job.text);
+  function stopDelivery(job, error, stop) {
+    var peer = String(job.peerSugoId);
+    saveDelivery(peer, { id: job.id, error: error, stop: stop });
+    reportDelivery(peer);
+  }
+
+  /** Gönderim ve sunucu onayı birbirinden bağımsız tamamlanır. */
+  function sendJob(job, name) {
+    var peer = String(job.peerSugoId);
+    if (deliveries[peer]) return false;
+    if (job.sendText === false) { stopDelivery(job, 'android: medya gönderilemiyor', true); return false; }
+    try {
+      if (!typeAndSend(job, name, peer)) return false;
+    } catch (error) {
+      stopDelivery(job, error.message, !!deliveries[peer] || error.message !== 'Profil panelden durduruldu.');
+      throw error;
+    }
+    saveDelivery(peer, { id: job.id, sent: true });
     d.lastSentAt = d.now();
+    reportDelivery(peer);
+    log('gönderildi ' + peer);
     return true;
   }
 
@@ -150,27 +227,21 @@ function createLoop(d) {
       var emptyChat = messages.length === 0;
       if (d.dryRun) { log('DRY_RUN ' + info.id + ' ' + name + ' mesaj=' + messages.length + (row.isMatch ? ' eşleşme' : '')); }
       else {
-        var body = { peerSugoId: info.id, peerName: name, voiceEnabled: false, messages: messages };
-        if (row.online) body.online = true;
+        var body = { peerSugoId: info.id, peerName: name, voiceEnabled: false, messages: messages, match: row.isMatch };
+        if (row.online && !row.isMatch) body.online = true;
         if (emptyChat) body.emptyChat = true;
         var res = api.ingest(body);
-        var last = messages.length ? messages[messages.length - 1] : null;
-        if (res && !res.job && last && last.dir === 'in') {
-          var out = messages.map(function (m) { return m.dir; }).lastIndexOf('out');
-          res = api.ingest(Object.assign({}, body, { unansweredFrom: out + 1 }));
-        }
         log('ingest ' + info.id + ' mesaj=' + messages.length + ' iş=' + (res && res.job ? res.job.kind + '/' + res.job.status : 'yok'));
         if (res && res.job && res.job.status === 'failed') throw new Error(res.job.error || 'cevap üretimi başarısız');
         if (res && res.job && res.job.status === 'pending') {
           var job = api.nextJob({ replyOnly: res.job.kind !== 'welcome' && messages.length > 0, visiblePeerIds: [info.id] });
-          if (job) sendJob(job);
+          if (job) sendJob(job, name);
         }
         if (emptyChat) greeted[info.id] = d.now();
       }
       handled[PE.normName(row.name)] = d.now();
     } catch (e) {
       log('sohbet hatası ' + info.id + ': ' + e.message);
-      api.reportError(info.id, e.message);
       retryAt[name] = d.now() + RETRY_AFTER_ERROR_MS;
     }
     return !!(recover() || true);
@@ -181,30 +252,30 @@ function createLoop(d) {
     log('iş alındı ' + job.peerSugoId + ' ' + job.kind);
     var row = null;
     for (var i = 0; i < rows.length; i++) if (cachedId(rows[i], dup) === String(job.peerSugoId)) { row = rows[i]; break; }
-    if (!row) { api.fail(job.id, 'sohbet listede yok: ' + job.peerSugoId); return true; }
+    if (!row) { stopDelivery(job, 'sohbet listede yok: ' + job.peerSugoId, false); return true; }
     var opened = nav.openChat(ui, row);
-    if (!opened) { api.fail(job.id, 'sohbet açılmadı'); recover(); return true; }
-    try { sendJob(job); handled[PE.normName(row.name)] = d.now(); }
+    if (!opened) { stopDelivery(job, 'android: hedef sohbet açılamadı', true); recover(); return true; }
+    try { sendJob(job, row.name); handled[PE.normName(row.name)] = d.now(); }
     catch (e) { log('iş hatası: ' + e.message); }
     recover();
     return true;
   }
 
-  function normalRow(rows) {
+  function normalRow(rows, dup) {
     var pick = null;
     for (var i = rows.length - 1; i >= 0; i--) {   // en alttaki = en eski
       var r = rows[i];
-      if (r.isMatch || r.unread <= 0) continue;
+      if (r.isMatch || r.unread <= 0 || deliveries[cachedId(r, dup)]) continue;
       if (retryAt[r.name] && d.now() < retryAt[r.name]) continue;
       if (recent(handled, PE.normName(r.name), HANDLED_RETRY_MS)) continue;
       pick = r; break;
     }
     return pick;
   }
-  function matchRow(rows) {
+  function matchRow(rows, dup) {
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
-      if (!r.isMatch) continue;
+      if (!r.isMatch || deliveries[cachedId(r, dup)]) continue;
       if (retryAt[r.name] && d.now() < retryAt[r.name]) continue;
       if (recent(handled, PE.normName(r.name), r.unread > 0 ? 5 * 60 * 1000 : MATCH_RETRY_MS)) continue;
       return r;
@@ -214,6 +285,9 @@ function createLoop(d) {
 
   /** true: iş yapıldı (beklemeden devam et). */
   function tick() {
+    if (!d.dryRun) {
+      Object.keys(deliveries).forEach(reportDelivery);
+    }
     var ctl = api.control();
     if (!ctl.active) { setState('durduruldu', ctl.error || 'panelden durduruldu'); return false; }
     if (!recover()) return false;
@@ -221,19 +295,19 @@ function createLoop(d) {
     var rows = lr.rows;
     var dup = PE.duplicateNames(rows);
     var visibleIds = [];
-    for (var i = 0; i < rows.length; i++) { var id = cachedId(rows[i], dup); if (id) visibleIds.push(id); }
+    for (var i = 0; i < rows.length; i++) { var id = cachedId(rows[i], dup); if (id && !deliveries[id]) visibleIds.push(id); }
 
     if (!d.dryRun) {
       var reply = api.nextJob({ replyOnly: true, visiblePeerIds: visibleIds });
       if (reply) return runJob(reply, rows, dup);
     }
-    var normal = normalRow(rows);
+    var normal = normalRow(rows, dup);
     if (normal) return handleRow(normal, dup);
     if (!d.dryRun) {
       var any = api.nextJob({ replyOnly: false, visiblePeerIds: visibleIds });
       if (any) return runJob(any, rows, dup);
     }
-    var match = matchRow(rows);
+    var match = matchRow(rows, dup);
     if (match) return handleRow(match, dup);
     // Aşağıdaki okunmamışlar için listeyi sayfa sayfa tara; sona gelince başa dön, tam taramalar arası 60 sn.
     if (!scan.atBottom && (scan.active || d.now() - scan.lastFullAt > 60000)) {

@@ -16,3 +16,4 @@ export * from './context-rules.js';
 export * from './gift.js';
 export * from './events.js';
 export { matchStats } from './stats.js';
+export { runRepairAnalysisBatch } from './conversation-repair.js';

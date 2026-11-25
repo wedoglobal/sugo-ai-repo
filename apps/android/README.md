@@ -2,6 +2,21 @@
 
 `com.voicemaker.android` (2.53.0) için erişilebilirlik tabanlı otomasyon. Sunucu sözleşmesi Chrome eklentisiyle aynıdır (`/api/ext/*`, Bearer anahtar); görsel ve ses yoktur, yalnız metin.
 
+## APK oluşturma ve konum
+
+1. AutoJs6’da telefondaki güncel proje klasörünü APK Builder Template ile paketle. `main.js`, `lib/location.js` dahil `lib/` ve yerel `config.json` pakette bulunmalı. Açık bir Builder formu varsa kapatıp güncel proje klasöründen yeniden aç. APK, yapılandırmayı kendi proje dizininden okur ve çalışma günlüğünü uygulamanın özel dizinine yazar. AutoJs6 içinden çalıştırıldığında `/sdcard/sugo-dev` yolları da kullanılabilir.
+2. APK’yı aşağıdaki komutla imzala. Komut, Builder eski ayarı taşımışsa APK içindeki paylaşılan depolama gereksinimini kapatır ve manifest’e test konumu izni ile Sugo paket sorgusunu ekler. Güncelleme kurulumları için mevcut APK’yı imzalayan anahtarı kullan. `apksigner` parolaları terminalden ister. Otomatik derleme için `SUGO_APK_STORE_PASSWORD` ve `SUGO_APK_KEY_PASSWORD` ortam değişkenleri kullanılabilir.
+
+   ```sh
+   python3 scripts/sign-android-apk.py builder.apk sugo-android.apk \
+     --build-tools "$ANDROID_HOME/build-tools/36.0.0" \
+     --keystore release.p12 --alias release
+   ```
+
+   APK, Sugo (`com.voicemaker.android`) ön planda değilse onu kendisi açar (Android 13+ için başlatma niyetiyle, öncesinde paket sorgusu manifest’e eklenir) ve ön plana gelmesini doğrular; açılamazsa günlüğe `Sugo uygulaması açılamadı` yazar.
+3. APK’yı aç, Android ayarlarında bu APK’nın erişilebilirlik hizmetini etkinleştir ve Sugo uygulamasında oturum aç. Android 13 veya üzerinde **Kısıtlanmış ayar** uyarısı çıkarsa APK’nın **Uygulama bilgisi → ⋮ → Kısıtlanmış ayarlara izin ver** seçeneğini onayla ve erişilebilirlik ekranına geri dön. Panelden konum kullanmak için geliştirici seçeneklerinde aynı APK’yı **Sahte konum uygulaması** olarak seç.
+4. Panelde Sugo profilinin **Konum ve bağlantı** sayfasında `sugo.live` için GPS’i kaydet. Android çalışırken konumu alır. **Gerçek konumu kullan** seçeneğini kaydetmek veya site profilini silmek test konumunu kaldırır. İzin ve uygulama durumunu Android günlüğündeki `[sugo-android] GPS` satırlarından kontrol et.
+
 ## Kurallar
 - Kodlar AutoJS6 (Rhino) içindir: `var`/`function`, CommonJS; `?.`, `??`, spread, `async` yok. Saf modüller (`lib/tree|screens|parse|nav`) AutoJS global'larına dokunmaz, Node'da vitest ile test edilir.
 - Yalnız erişilebilirlik düğüm ağacı kullanılır: ekran görüntüsü, OCR, panoya bağımlılık, root, sabit piksel yok. Android 10 (API 29) ve üzeri hedeflenir; AutoJS6 minSdk 24.

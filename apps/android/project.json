@@ -1,1 +1,11 @@
-{ "name": "Sugo Android", "main": "main.js", "packageName": "live.sugo.android", "versionName": "0.1.0", "versionCode": 1 }
+{
+  "name": "Sugo Android",
+  "main": "main.js",
+  "packageName": "live.sugo.android",
+  "versionName": "0.1.3",
+  "versionCode": 4,
+  "excludeDirs": ["build"],
+  "launchConfig": {
+    "requiresSharedStorage": false
+  }
+}

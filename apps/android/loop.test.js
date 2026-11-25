@@ -8,9 +8,10 @@ const { createPeers } = require('./lib/peers.js');
 function setup({ rows, pages, profiles, chats, api: apiOpts, dryRun = false, allowPeers = null }) {
   const ui = fakeUi({ rows, pages, profiles, chats });
   const api = fakeApi(apiOpts);
-  const peers = createPeers(memStore(), () => ui.now());
-  const loop = createLoop({ ui, api, peers, now: () => ui.now(), log: () => {}, dryRun, allowPeers });
-  return { ui, api, peers, loop };
+  const store = memStore();
+  const peers = createPeers(store, () => ui.now());
+  const create = () => createLoop({ ui, api, store, peers, now: () => ui.now(), log: () => {}, dryRun, allowPeers });
+  return { ui, api, peers, loop: create(), create };
 }
 const unreadRow = { name: 'Ali', preview: 'selam nasılsın', unread: 1 };
 const text = (api, name) => api.calls.filter((c) => c[0] === name);
@@ -51,16 +52,51 @@ describe('döngü', () => {
     expect(ui.calls).toEqual([]);
     expect(api.calls).toEqual([]);
   });
-  it('gönderim doğrulanamazsa iş fail edilir ve hata raporlanır', () => {
+  it('gönderim doğrulanamazsa ikinci kez tıklamadan aynı yanıtı durdurur', () => {
     const { ui, api, loop } = setup({
       rows: [unreadRow], profiles: { Ali: 'profile' }, chats: { Ali: [{ dir: 'in', text: 'x' }] },
       api: { ingestResult: { job: { id: 'j2', status: 'pending', kind: 'reply' } }, job: { id: 'j2', kind: 'reply', peerSugoId: '100000001', text: 'merhaba', sendText: true } }
     });
     ui.sendOk = false;
     loop.tick();
-    expect(text(api, 'fail')[0][1]).toBe('j2');
-    expect(text(api, 'error').length).toBeGreaterThan(0);
+    expect(text(api, 'fail')).toEqual([['fail', 'j2', 'android: tıklama sonrası teslim doğrulanamadı', true]]);
+    expect(ui.calls.filter((c) => c === 'click:id_chat_send_btn')).toHaveLength(1);
     expect(ui.screen).toBe('list');
+  });
+  it('balon önce görünse bile ünlem çıkınca işi başarılı saymaz', () => {
+    const { ui, api, loop } = setup({
+      rows: [unreadRow], profiles: { Ali: 'profile' }, chats: { Ali: [{ dir: 'in', text: 'x' }] },
+      api: { ingestResult: { job: { status: 'pending', kind: 'reply' } }, job: { id: 'j5', kind: 'reply', peerSugoId: '100000001', text: 'merhaba' } },
+    });
+    ui.rejectAfter = 600;
+    loop.tick();
+    expect(text(api, 'complete')).toEqual([]);
+    expect(text(api, 'fail')).toEqual([['fail', 'j5', expect.stringContaining('ünlem'), true]]);
+    expect(ui.sent).toHaveLength(1);
+  });
+  it('hedef sohbetin son sırasında yanıt görünüyorsa tekrar göndermez', () => {
+    const { ui, api, loop } = setup({
+      rows: [unreadRow], profiles: { Ali: 'profile' }, chats: { Ali: [{ dir: 'in', text: 'x' }, { dir: 'out', text: 'merhaba' }] },
+      api: { ingestResult: { job: { status: 'pending', kind: 'reply' } }, job: { id: 'j6', kind: 'reply', peerSugoId: '100000001', text: 'merhaba' } },
+    });
+    loop.tick();
+    expect(text(api, 'beginDelivery')).toEqual([]);
+    expect(text(api, 'fail')).toEqual([['fail', 'j6', expect.stringContaining('zaten'), true]]);
+    expect(ui.sent).toEqual([]);
+  });
+  it('complete bağlantısı kesilirse yeniden başlatıldıktan sonra yalnız onayı yollar', () => {
+    const { ui, api, loop, create } = setup({
+      rows: [unreadRow], profiles: { Ali: 'profile' }, chats: { Ali: [{ dir: 'in', text: 'x' }] },
+      api: { ingestResult: { job: { status: 'pending', kind: 'reply' } }, job: { id: 'j7', kind: 'reply', peerSugoId: '100000001', text: 'merhaba' } },
+    });
+    const complete = api.complete;
+    api.complete = () => { throw new Error('bağlantı kesildi'); };
+    loop.tick();
+    api.complete = complete;
+    create().tick();
+    expect(text(api, 'complete')).toEqual([['complete', 'j7']]);
+    expect(text(api, 'fail')).toEqual([]);
+    expect(ui.sent).toHaveLength(1);
   });
   it('yazmadan önce girişe dokunulur ve klavye/odak beklenir', () => {
     const { ui, loop } = setup({

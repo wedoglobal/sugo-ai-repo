@@ -2,14 +2,15 @@ import { buildExtractMessages, mergePermanent, newTempNotes, parseExtract } from
 import { buildReplyMessages, cleanReply, detectDisclosures, readPersona, repeatedDisclosures } from './persona.js';
 import { applyReplacements } from './filter.js';
 import { isGiftText, onlyGifts } from './gift.js';
-import { pickableGreetings } from './greetings.js';
+import { onlineGreeting, pickableGreetings } from './greetings.js';
 import { asksForCall, asksForPhoto, asksForVoice, createSpeechMedia, pickMedia, shouldUseCatalogVoice } from './media.js';
 import { queueNudge } from './nudge.js';
 import { recentlyRefused } from './refusal.js';
 import { matchContextRules } from './context-rules.js';
 import { removeRepetition } from './repetition.js';
 import { ROUTINE_PREFIX, routineNow } from './routine.js';
-import { isFollowNotice, isIncomingPhoto, isIncomingVoice } from './events.js';
+import { isFollowNotice, isIncomingPhoto, isIncomingVoice, isOnlineNotice } from './events.js';
+import { assignConversationRepair, observeAndQueueRepair, selectRepairRecipe } from './conversation-repair.js';
 
 const HISTORY_LIMIT = 20;
 
@@ -88,34 +89,47 @@ async function cancelJob(db, job, reason) {
 
 /**
  * Extension'ın gönderdiği sohbet görüntüsünü kaydeder, gerekirse iş kuyruğa alıp cevabı üretir.
- * @param {{hostSugoId:string, peerSugoId:string, peerName?:string, voiceEnabled?:boolean, online?:boolean, emptyChat?:boolean, unansweredFrom?:number, messages:{dir:'in'|'out',text:string,ts?:string,diamonds?:number}[]}} input
+ * @param {{hostSugoId:string, peerSugoId:string, peerName?:string, voiceEnabled?:boolean, online?:boolean, match?:boolean, matchEventId?:string, emptyChat?:boolean, unansweredFrom?:number, messages:{dir:'in'|'out',text:string,ts?:string,diamonds?:number}[]}} input
  */
 export async function ingest(db, deps, input) {
   const host = await getHost(db, input.hostSugoId);
   if (host.active === false) return { pairId: pairId(host.sugo_id, input.peerSugoId), job: null, paused: true };
   const pair = await ensurePair(db, host, input.peerSugoId, input.peerName);
-  let state = must(await db.from('pairs').select('reply_disabled_reason').eq('id', pair).single());
+  const state = must(await db.from('pairs').select('reply_disabled_reason, match_event_token').eq('id', pair).single());
   // Eklenti kadın/engel kontrolünü sohbet açıkken yaptı; sitede boş görünen sohbet eski bir "yanıt dışı" işaretiyle kilitli kalmaz.
-  if (state.reply_disabled_reason && input.emptyChat === true) {
+  if (state.reply_disabled_reason && input.emptyChat === true && input.match !== true) {
     must(await db.from('pairs').update({ reply_disabled_reason: null }).eq('id', pair));
-    state = { reply_disabled_reason: null };
+    state.reply_disabled_reason = null;
   }
   if (state.reply_disabled_reason) return { pairId: pair, job: null, ignored: state.reply_disabled_reason };
+  if (input.match === false && state.match_event_token) {
+    must(await db.from('pairs').update({ match_event_token: null }).eq('id', pair).eq('match_event_token', state.match_event_token));
+  }
   must(await db.from('pairs').update({ delivery_retry_at: null }).eq('id', pair));
   if (typeof input.voiceEnabled === 'boolean') must(await db.from('pairs').update({ voice_enabled: input.voiceEnabled }).eq('id', pair));
   const snap = await keyedSnapshot(input.messages.filter((m) => (m.dir === 'in' || m.dir === 'out') && m.text?.trim()));
+  const last = snap.at(-1);
+  const matched = input.match === true;
+  const matchToken = matched ? (input.matchEventId ? `id:${input.matchEventId}` : 'visible') : null;
+  const online = !matched && (input.online === true || (last?.dir === 'in' && isOnlineNotice(last.text)));
 
   const existing = must(await db.from('messages').select('id, dedupe_key, direction, text, sugo_ts, diamonds').eq('pair_id', pair));
   const known = new Map(existing.map((m) => [m.dedupe_key, m]));
   const unsyncedOut = existing.filter((m) => m.direction === 'out' && m.sugo_ts == null);
+  const [stopped] = Number.isInteger(input.unansweredFrom) && input.unansweredFrom >= 0
+    ? must(await db.from('jobs').select('covers_until').eq('pair_id', pair).eq('kind', 'reply')
+      .eq('delivery_stopped', true).not('covers_until', 'is', null).order('covers_until', { ascending: false }).limit(1))
+    : [];
 
   const lastOut = snap.map((m) => m.dir).lastIndexOf('out');
   let newIn = 0;
   const answeredKeys = [];
   const unansweredKeys = [];
   for (const [i, m] of snap.entries()) {
-    const forcedUnread = m.dir === 'in' && Number.isInteger(input.unansweredFrom) && input.unansweredFrom >= 0 && i >= input.unansweredFrom;
-    const notice = m.dir === 'in' && isFollowNotice(m.text);
+    const seen = known.get(m.key);
+    const forcedUnread = m.dir === 'in' && Number.isInteger(input.unansweredFrom) && input.unansweredFrom >= 0 && i >= input.unansweredFrom
+      && !(seen && stopped && seen.id <= stopped.covers_until);
+    const notice = m.dir === 'in' && (isFollowNotice(m.text) || isOnlineNotice(m.text));
     const answered = notice || (!forcedUnread && (m.dir === 'out' || i < lastOut));
     if (forcedUnread && !notice) unansweredKeys.push(m.key);
     // Kayıtlı ama henüz cevaplanmamış mesajı DOM'daki sonraki bir out yüzünden kapatma.
@@ -123,7 +137,6 @@ export async function ingest(db, deps, input) {
     if (m.dir === 'in' && answered && (notice || !known.has(m.key))) answeredKeys.push(m.key);
     const diamonds = m.dir === 'out' && m.diamonds > 0 ? Math.floor(m.diamonds) : 0;
     const diamondFields = diamonds ? { diamonds, diamonds_at: new Date().toISOString() } : {};
-    const seen = known.get(m.key);
     if (seen) {
       if (forcedUnread && !notice) newIn++;
       if (diamonds && seen.diamonds !== diamonds) must(await db.from('messages').update(seen.diamonds ? { diamonds } : diamondFields).eq('id', seen.id));
@@ -154,11 +167,15 @@ export async function ingest(db, deps, input) {
   const total = must(await db.from('messages').select('id').eq('pair_id', pair).limit(1));
   let job = await activeJob(db, pair);
 
+  if (job?.status === 'pending' && ((job.kind === 'repair' && (unread.length || matched)) || (job.kind === 'nudge' && matched && !unread.length))) {
+    await cancelJob(db, job, job.kind === 'repair' ? 'repair: sohbet değişti' : 'eşleşme selamı öncelikli');
+    job = null;
+  }
   if (unread.length === 0 && job?.status === 'pending' && job.kind === 'reply') {
     await cancelJob(db, job, 'cevaplanacak mesaj kalmadı');
     job = null;
   }
-  if (input.emptyChat === true && unread.length === 0 && job) {
+  if (!online && !matched && input.emptyChat === true && unread.length === 0 && job) {
     // Boş sohbette hemen selam gider: dürtme iptal edilir, kilitte takılı kalan selam serbest bırakılır.
     if (job.kind !== 'welcome') {
       await cancelJob(db, job, 'sohbet boş: karşılama gönderilecek');
@@ -172,27 +189,56 @@ export async function ingest(db, deps, input) {
   let needsGeneration = false;
   if (unread.length > 0) {
     if (!job) {
-      job = must(await db.from('jobs').insert({ pair_id: pair, host_id: host.id, kind: 'reply' }).select().single());
+      job = must(await db.from('jobs').insert({ pair_id: pair, host_id: host.id, kind: 'reply', ...(matchToken ? { match_event_token: matchToken } : {}) }).select().single());
       needsGeneration = true;
     } else if (job.status === 'pending' && (job.kind !== 'reply' || newIn > 0 || (!job.reply_text && Date.now() - Date.parse(job.updated_at || job.created_at) > 180000))) {
       // Gelen gerçek mesaj, henüz gönderilmemiş selam veya dürtmenin yerini alır.
-      must(await db.from('jobs').update({ kind: 'reply', reply_text: null, media_id: null, send_text: true, error: null, updated_at: new Date().toISOString() }).eq('id', job.id));
+      must(await db.from('jobs').update({ kind: 'reply', online_greeting: false, ...(matchToken ? { match_event_token: matchToken } : {}), reply_text: null, media_id: null, send_text: true, error: null, updated_at: new Date().toISOString() }).eq('id', job.id));
       job = { ...job, kind: 'reply' };
       needsGeneration = true;
     }
-  } else if ((total.length === 0 || input.online === true || input.emptyChat === true) && !job) {
-    // Çevrim içi partnere, hiç yazışılmamış sohbete ve sitede boş görünen eşleşmeye karşılama selamı gider.
+    if (matchToken && job.status === 'pending') {
+      if (!needsGeneration && job.match_event_token !== matchToken) {
+        must(await db.from('jobs').update({ match_event_token: matchToken }).eq('id', job.id).eq('status', 'pending'));
+      }
+      if (state.match_event_token !== matchToken) must(await db.from('pairs').update({ match_event_token: matchToken }).eq('id', pair));
+    }
+  } else if (matched) {
+    if ((!job || (job.kind === 'welcome' && !job.match_event_token && job.status === 'pending')) && !(await recentlyRefused(db, pair, deps.now?.() ?? new Date()))) {
+      const [queued] = must(await db.rpc('queue_match_greeting', { p_host: host.id, p_pair: pair, p_event: matchToken }));
+      if (queued) {
+        job = queued;
+        needsGeneration = true;
+      }
+    }
+    if (job?.match_event_token && job.status === 'pending' && !job.reply_text && Date.now() - Date.parse(job.updated_at) > 180000) {
+      needsGeneration = true;
+    }
+  } else if (online && !job) {
+    const now = deps.now?.() ?? new Date();
+    if (await recentlyRefused(db, pair, now)) return { pairId: pair, job: null, refused: true };
+    const since = new Date(now.getTime() - 24 * 3600_000).toISOString();
+    const text = onlineGreeting(now, readPersona(host.persona).timeZone, deps.random ?? Math.random);
+    const inserted = must(await db.rpc('queue_online_greeting', { p_host: host.id, p_pair: pair, p_text: text, p_since: since }));
+    job = inserted[0] ?? await activeJob(db, pair);
+  } else if ((total.length === 0 || input.emptyChat === true) && !job) {
+    // İlk sohbet veya sitede boş görünen eşleşme normal karşılama kuyruğuna girer.
     // Mesajlarımızı reddeden (kırmızı ünlem) kişiye bekleme süresi dolana dek yeniden selam kuyruğa alınmaz.
     if (await recentlyRefused(db, pair, deps.now?.() ?? new Date())) return { pairId: pair, job: null, refused: true };
     job = must(await db.from('jobs').insert({ pair_id: pair, host_id: host.id, kind: 'welcome' }).select().single());
     needsGeneration = true;
-  } else if ((total.length === 0 || input.emptyChat === true) && job?.kind === 'welcome' && job.status === 'pending' && !job.reply_text
+  } else if ((online || total.length === 0 || input.emptyChat === true) && job?.kind === 'welcome' && job.status === 'pending' && !job.reply_text
     && (input.emptyChat === true || Date.now() - Date.parse(job.updated_at || job.created_at) > 180000)) {
-    // Metni üretilemeden takılı kalan selam, sohbet sitede boş göründüğü sürece yeniden üretilir.
+    // Selamın metni yoksa uygun sohbet tekrar açıldığında üretim yeniden denenir.
     must(await db.from('jobs').update({ error: null, updated_at: new Date().toISOString() }).eq('id', job.id));
     needsGeneration = true;
   }
 
+  if (host.repair_enabled) {
+    const repair = await observeAndQueueRepair(db, deps, host, pair, snap, { allowQueue: deps.repairClient && !job && !unread.length && !input.emptyChat && !matched }).catch(() => null);
+    // Eski istemciler açık sohbetten selam görünce tüm iş türlerini sorgular.
+    if (repair) return { pairId: pair, job: { id: repair.id, status: repair.status, kind: 'welcome' } };
+  }
   if (!job) return { pairId: pair, job: null };
   if (!needsGeneration) return { pairId: pair, job: { id: job.id, status: job.status, kind: job.kind } };
   const result = await generateSafely(db, deps, job.id);
@@ -258,6 +304,11 @@ export async function generate(db, deps, jobId, { rejected = '' } = {}) {
   let pair = must(await db.from('pairs').select('*').eq('id', job.pair_id).single());
   if (pair.reply_disabled_reason) throw new Error(`yanıt dışı: ${pair.reply_disabled_reason}`);
   const persona = readPersona(host.persona);
+  if (job.online_greeting) {
+    const text = onlineGreeting(now, persona.timeZone, deps.random ?? Math.random);
+    must(await db.from('jobs').update({ reply_text: text, error: null, updated_at: now.toISOString() }).eq('id', jobId));
+    return text;
+  }
 
   const unreadRows = must(await db.from('messages').select('id, text').eq('pair_id', pair.id).eq('direction', 'in').eq('handled', false).order('id'));
   const unread = unreadRows.map((m) => m.text);
@@ -361,7 +412,7 @@ export async function generate(db, deps, jobId, { rejected = '' } = {}) {
     : '';
   const ask = async (retryRule) => cleanReply(removeRepetition(applyReplacements(await deps.llm({
     model: host.model || deps.models.chat, temperature: 0.9, maxTokens: 150, thinkTokens: 0,
-    messages: buildReplyMessages({ kind: job.kind, persona, permanent: pair.permanent, disclosed: pair.disclosed, temp, history, unread, avoid, knowledge, now, extraRule: [mediaRule, rejectedRule, retryRule].filter(Boolean).join(' '), routine, rules: Array.isArray(personaRules) ? personaRules : [], contextRules: matchContextRules(contextRules, [...temp, ...unread]) }),
+    messages: buildReplyMessages({ kind: job.kind, match: !!job.match_event_token, persona, permanent: pair.permanent, disclosed: pair.disclosed, temp, history, unread, avoid, knowledge, now, extraRule: [mediaRule, rejectedRule, retryRule].filter(Boolean).join(' '), routine, rules: Array.isArray(personaRules) ? personaRules : [], contextRules: matchContextRules(contextRules, [...temp, ...unread]) }),
   }), rules), persona, history, unread));
 
   const produce = async () => {
@@ -388,6 +439,18 @@ export async function generate(db, deps, jobId, { rejected = '' } = {}) {
   let reply = callReply || photoReply || (voiceOnly && !hasTextContext ? voiceFallback : voiceReceived ? (await produce().catch(() => null)) || voiceFallback : await produce());
   if (!reply) throw new Error('model kullanılabilir bir cevap üretemedi');
 
+  if (deps.repairClient && job.kind === 'reply' && !wanted && !mediaId && !rejected && !voiceReceived && !photoReceived && !gifted) {
+    const assignment = await assignConversationRepair(db, host, job, history, unread).catch(() => null);
+    if (assignment?.arm % 2 === 1) {
+      const instruction = selectRepairRecipe(assignment.recipes,
+        [...history, ...unread.map((text) => ({ direction: 'in', text }))], reply);
+      if (instruction) {
+        const revised = await ask(`Sohbeti ilerletmek için: ${instruction} Son mesajdaki ayrıntıya dayan; olay, mazeret veya kişisel bilgi uydurma.`).catch(() => null);
+        if (revised && !repeatedDisclosures(revised, pair.disclosed, unread).length) reply = revised;
+      }
+    }
+  }
+
   let sendText = true;
   if (wanted === 'audio' && !mediaId && canSpeak && pair.voice_enabled) {
     try {
@@ -409,11 +472,23 @@ export const FILTER_FILLERS = ['askm', 'canım', 'ömrüm', 'tatlım', 'hayatım
 
 /** Reddedilen metnin yerine rastgele kısa bir hitap yazar (reddedilenle aynı olanı seçmez) ve job'a kaydeder. */
 export async function rejectJob(db, deps, jobId, rejectedText = '') {
-  const job = must(await db.from('jobs').select('id, status').eq('id', jobId).single());
+  const job = must(await db.from('jobs').select('id, status, kind, online_greeting, host_id').eq('id', jobId).single());
   if (job.status === 'done' || job.status === 'failed') throw new Error('job zaten kapandı');
-  const choices = FILTER_FILLERS.filter((f) => f !== String(rejectedText).trim().toLocaleLowerCase('tr'));
-  const text = choices[Math.floor((deps?.random ?? Math.random)() * choices.length)];
-  must(await db.from('jobs').update({ reply_text: text, send_text: true, error: null, updated_at: new Date().toISOString() }).eq('id', jobId));
+  if (job.kind === 'repair') {
+    await failJob(db, jobId, 'sugo filtresi mesajları reddetti: takip mesajı');
+    return null;
+  }
+  const previous = String(rejectedText).trim().toLocaleLowerCase('tr');
+  const random = deps?.random ?? Math.random;
+  let text;
+  if (job.online_greeting) {
+    const host = must(await db.from('hosts').select('persona').eq('id', job.host_id).single());
+    text = onlineGreeting(deps?.now?.() ?? new Date(), readPersona(host.persona).timeZone, random, previous);
+  } else {
+    const choices = FILTER_FILLERS.filter((f) => f !== previous);
+    text = choices[Math.floor(random() * choices.length)];
+  }
+  must(await db.from('jobs').update({ reply_text: text, send_text: true, error: null, filter_rejected: true, updated_at: new Date().toISOString() }).eq('id', jobId));
   return text;
 }
 
@@ -424,7 +499,7 @@ export async function completeJob(db, jobId) {
   if (!job.reply_text) throw new Error('job için cevap yok');
   const host = must(await db.from('hosts').select('persona').eq('id', job.host_id).single());
   const pair = must(await db.from('pairs').select('disclosed').eq('id', job.pair_id).single());
-  must(await db.from('messages').upsert({ pair_id: job.pair_id, direction: 'out', text: job.reply_text, dedupe_key: `sent#${job.id}`, sugo_ts: null, handled: true }, { onConflict: 'pair_id,dedupe_key', ignoreDuplicates: true }));
+  must(await db.from('messages').upsert({ pair_id: job.pair_id, direction: 'out', text: job.reply_text, dedupe_key: `sent#${job.id}`, sent_job_id: job.id, sugo_ts: null, handled: true }, { onConflict: 'sent_job_id', ignoreDuplicates: true }));
   if (job.covers_until) {
     must(await db.from('messages').update({ handled: true }).eq('pair_id', job.pair_id).eq('direction', 'in').lte('id', job.covers_until));
   }
@@ -443,8 +518,9 @@ export async function completeJob(db, jobId) {
 }
 
 export async function failJob(db, jobId, error = '') {
-  const job = must(await db.from('jobs').select('pair_id, status').eq('id', jobId).single());
+  const job = must(await db.from('jobs').select('pair_id, status, kind, error').eq('id', jobId).single());
   if (job.status === 'done') return;
+  if (job.kind === 'repair' && job.status === 'failed') return;
   must(await db.from('jobs').update({ status: 'failed', error: String(error).slice(0, 500), locked_until: null, updated_at: new Date().toISOString() }).eq('id', jobId).neq('status', 'done'));
   if (String(error).startsWith('sohbet listede yok:')) {
     must(await db.from('pairs').update({ delivery_retry_at: new Date(Date.now() + 10 * 60_000).toISOString() }).eq('id', job.pair_id));
@@ -452,7 +528,7 @@ export async function failJob(db, jobId, error = '') {
 }
 
 /** Extension için sıradaki hazır cevabı kilitleyerek verir. */
-export async function nextJob(db, hostSugoId, deps, { replyOnly = false, visiblePeerIds = null } = {}) {
+export async function nextJob(db, hostSugoId, deps, { replyOnly = false, visiblePeerIds = null, android = false } = {}) {
   const host = await getHost(db, hostSugoId);
   if (host.active === false) return null;
   const visiblePairIds = Array.isArray(visiblePeerIds) ? [...new Set(visiblePeerIds)].slice(0, 1000).map((id) => pairId(host.sugo_id, id)) : null;
@@ -461,11 +537,14 @@ export async function nextJob(db, hostSugoId, deps, { replyOnly = false, visible
   let nudgeScanned = false;
   let recovered = false;
   for (;;) {
-    const rows = must(await db.rpc(visiblePairIds ? 'claim_available_job' : replyOnly ? 'claim_next_reply_job' : 'claim_next_job',
+    const rows = must(await db.rpc(android && visiblePairIds ? 'claim_available_android_job' : visiblePairIds ? 'claim_available_job' : replyOnly ? 'claim_next_reply_job' : 'claim_next_job',
       visiblePairIds ? { p_host: host.id, p_pair_ids: visiblePairIds, p_reply_only: replyOnly } : { p_host: host.id }));
-    const job = rows?.[0];
+    let job = rows?.[0];
+    if (!job && host.repair_enabled && deps?.repairClient && !replyOnly && visiblePairIds) {
+      job = must(await db.rpc('claim_conversation_repair_job', { p_host: host.id, p_pair_ids: visiblePairIds }))?.[0];
+    }
     if (!job) {
-      if (deps && !replyOnly && !nudgeScanned) {
+      if (deps && !android && !replyOnly && !nudgeScanned) {
         nudgeScanned = true;
         if (await queueNudge(db, deps, host, undefined, { visiblePairIds }).catch(() => null)) continue;
       }
@@ -475,7 +554,8 @@ export async function nextJob(db, hostSugoId, deps, { replyOnly = false, visible
         visiblePairIds ? { p_host: host.id, p_pair_ids: visiblePairIds } : { p_host: host.id }))?.[0];
       if (!repair) return null;
       const previous = must(await db.from('jobs').select('reply_text, media_id, send_text, covers_until')
-        .eq('pair_id', repair.pair_id).eq('kind', 'reply').eq('status', 'failed').not('reply_text', 'is', null).order('id', { ascending: false }).limit(1))?.[0];
+        .eq('pair_id', repair.pair_id).eq('kind', 'reply').eq('status', 'failed').eq('delivery_stopped', false)
+        .not('reply_text', 'is', null).order('id', { ascending: false }).limit(1))?.[0];
       const lastUnread = must(await db.from('messages').select('id').eq('pair_id', repair.pair_id)
         .eq('direction', 'in').eq('handled', false).order('id', { ascending: false }).limit(1))?.[0];
       if (previous && lastUnread && previous.covers_until >= lastUnread.id) {
@@ -557,9 +637,10 @@ export async function reportExtensionError(db, { hostSugoId, peerSugoId, error }
 /** Başarısız job'ı yeniden üretir (dashboard "tekrar dene"). */
 export async function retryJob(db, deps, jobId) {
   const job = must(await db.from('jobs').select('*').eq('id', jobId).single());
-  if (job.kind === 'nudge') throw new Error('dürtme tekrar denenmez; kişi cevap verince yeniden oluşur');
+  if (job.delivery_stopped) throw new Error('teslimi durdurulan iş tekrar denenmez');
+  if (job.kind === 'nudge' || job.kind === 'repair') throw new Error('takip mesajı tekrar denenmez');
   if (await activeJob(db, job.pair_id)) throw new Error('bu pair için zaten aktif bir job var');
-  const fresh = must(await db.from('jobs').insert({ pair_id: job.pair_id, host_id: job.host_id, kind: job.kind }).select().single());
+  const fresh = must(await db.from('jobs').insert({ pair_id: job.pair_id, host_id: job.host_id, kind: job.kind, online_greeting: job.online_greeting }).select().single());
   return generateSafely(db, deps, fresh.id);
 }
 

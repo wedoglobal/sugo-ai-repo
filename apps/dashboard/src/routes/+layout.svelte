@@ -5,7 +5,7 @@
   let { children, data } = $props();
   let menuOpen = $state(false);
   const groups = [
-    { label: 'ÇALIŞMA ALANI', items: [['/', 'Genel bakış', 'grid'], ['/hosts', 'AI profilleri', 'users'], ['/pairs', 'Sohbetler', 'chat'], ['/queue', 'İş kuyruğu', 'queue'], ['/stats', 'İstatistikler', 'grid'], ['/status', 'Canlı durum', 'queue']] },
+    { label: 'ÇALIŞMA ALANI', items: [['/', 'Genel bakış', 'grid'], ['/hosts', 'AI profilleri', 'users'], ['/pairs', 'Sohbetler', 'chat'], ['/conversation-repair', 'Sohbet Akışı', 'chat'], ['/queue', 'İş kuyruğu', 'queue'], ['/stats', 'İstatistikler', 'grid'], ['/status', 'Canlı durum', 'queue']] },
     { label: 'DAVRANIŞ VE İÇERİK', items: [['/greetings', 'Karşılama', 'spark'], ['/rules', 'Konuşma kuralları', 'rules'], ['/filters', 'Mesaj filtreleri', 'filter'], ['/gift-thanks', 'Hediye yanıtları', 'gift'], ['/photo-triggers', 'Fotoğraf istekleri', 'image']] },
     { label: 'GELİŞTİR', items: [['/playground', 'Deneme alanı', 'lab']] },
   ];

@@ -30,6 +30,11 @@ export async function queueNudge(db, deps, host, now = deps.now?.() ?? new Date(
   if (!pairs.length) return null;
   // Aktif işi olan sohbetler tek sorguda elenir; kalanlar için ayrı ayrı sorgu atılmaz.
   const busy = new Set(must(await db.from('jobs').select('pair_id').eq('host_id', host.id).in('status', ['pending', 'processing'])).map((j) => j.pair_id));
+  if (host.repair_enabled) {
+    const since = new Date(now.getTime() - (24 * 60 + 30) * 60_000).toISOString();
+    const trials = must(await db.from('conversation_repair_trials').select('pair_id').eq('host_id', host.id).gte('sent_at', since));
+    for (const trial of trials) busy.add(trial.pair_id);
+  }
 
   const refusedSince = new Date(now.getTime() - REFUSAL_COOLDOWN_MS).toISOString();
   const refused = new Set(must(await db.from('jobs').select('pair_id').eq('host_id', host.id).eq('status', 'failed').like('error', `${REFUSED_ERROR}%`).gt('updated_at', refusedSince)).map((j) => j.pair_id));
@@ -41,7 +46,8 @@ export async function queueNudge(db, deps, host, now = deps.now?.() ?? new Date(
     if (!last || last.direction !== 'out' || ms(last.created_at) > after) continue;
     const [lastIn] = must(await db.from('messages').select('created_at').eq('pair_id', pair.id).eq('direction', 'in').order('id', { ascending: false }).limit(1));
     if (!lastIn) continue;
-    const done = must(await db.from('jobs').select('id').eq('pair_id', pair.id).eq('kind', 'nudge').neq('status', 'failed').gt('created_at', lastIn.created_at));
+    const done = must(await db.from('jobs').select('id').eq('pair_id', pair.id).eq('kind', 'nudge')
+      .or('status.neq.failed,delivery_stopped.eq.true').gt('created_at', lastIn.created_at));
 
     if (done.length) continue;
     const photo = await pickMedia(db, { hostId: host.id, pairId: pair.id, kind: 'image' });

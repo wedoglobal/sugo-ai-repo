@@ -2,7 +2,7 @@ import { retryJob } from '@sugo/core';
 import { db, deps, must } from '$lib/server/deps.js';
 
 export const load = async () => ({
-  jobs: must(await db().from('jobs').select('id, pair_id, kind, status, reply_text, error, attempts, due_at').order('id', { ascending: false }).limit(100)),
+  jobs: must(await db().from('jobs').select('id, pair_id, kind, status, reply_text, error, attempts, due_at, delivery_stopped').order('id', { ascending: false }).limit(100)),
 });
 
 export const actions = {

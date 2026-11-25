@@ -23,16 +23,23 @@ export function fakeUi({ rows: rowsArg, pages: pagesArg, profiles, chats = {} })
   const pages = pagesArg ?? [rowsArg]; let page = 0;
   const rows = new Proxy([], { get: (_, p) => (pages[page])[p], has: (_, p) => p in pages[page] });
   let screen = 'list'; let focused = false; let current = null; let t = 0; let typed = ''; let sendOk = true;
+  let rejectAfter = null; let lastTap = 0;
   const sent = []; const calls = [];
   const chatTree = (name) => {
     const root = tree.parseDump(readFileSync(new URL('./fixtures/chat-empty-match.txt', import.meta.url), 'utf8'));
     const list = tree.findById(root, 'id_msg_list_view');
     let top = 300;
-    for (const m of [...(chats[name] ?? []), ...sent.filter((s) => s.name === name).map((s) => ({ dir: 'out', text: s.text }))]) {
+    for (const m of [...(chats[name] ?? []), ...sent.filter((s) => s.name === name).map((s) => ({
+      dir: 'out', text: s.text, failed: rejectAfter !== null && t - lastTap >= rejectAfter
+    }))]) {
       const row = tree.makeNode('ViewGroup', '', '', '', 0, top, 1080, top + 120, false);
       const txt = tree.makeNode('TextView', 'id_chat_msg_text', m.text, '', 143, top, 898, top + 120);
       const av = tree.makeNode('ImageView', 'id_user_avatar_iv', '', '', m.dir === 'out' ? 920 : 44, top, m.dir === 'out' ? 1036 : 160, top + 116, true);
       for (const n of [txt, av]) { n.parent = row; row.children.push(n); }
+      if (m.failed) {
+        const icon = tree.makeNode('ImageView', 'chatting_state_iv', '', '', 100, top, 140, top + 40, true);
+        icon.parent = row; row.children.push(icon);
+      }
       row.parent = list; list.children.push(row); top += 140;
     }
     const title = tree.findById(root, 'id_chatting_title_username_tv'); if (title) title.text = name;
@@ -41,6 +48,7 @@ export function fakeUi({ rows: rowsArg, pages: pagesArg, profiles, chats = {} })
   };
   const ui = {
     calls, sent, get screen() { return screen; }, set sendOk(v) { sendOk = v; },
+    set rejectAfter(v) { rejectAfter = v; },
     snapshot() {
       const root = screen === 'list' ? listDump(pages[page]) : screen === 'chat' ? chatTree(current) : load(profiles[current]);
       return { root, size };
@@ -53,7 +61,7 @@ export function fakeUi({ rows: rowsArg, pages: pagesArg, profiles, chats = {} })
         screen = node.id === 'id_user_avatar_iv' ? 'profile' : 'chat';
       } else if (node.id === 'id_back' || node.id === 'backBtn') { screen = 'list'; typed = ''; focused = false; }
       else if (node.id === 'id_input_edit_text') focused = true;
-      else if (node.id === 'id_chat_send_btn' && sendOk) { sent.push({ name: current, text: typed }); typed = ''; }
+      else if (node.id === 'id_chat_send_btn' && sendOk) { sent.push({ name: current, text: typed }); typed = ''; lastTap = t; }
     },
     setText(node, text) { if (!focused) throw new Error('odaksız yazıldı'); typed = text; calls.push('setText'); },
     swipe(x1, y1, x2, y2) { calls.push('swipe'); if (screen !== 'list') return; page = y1 > y2 ? Math.min(page + 1, pages.length - 1) : Math.max(page - 1, 0); },
@@ -77,8 +85,9 @@ export function fakeApi({ active = true, ingestResult = {}, job = null, jobs = [
       const i = queue.findIndex((j) => (o.visiblePeerIds ?? []).includes(String(j.peerSugoId)));
       return i >= 0 ? queue.splice(i, 1)[0] : null;
     },
+    beginDelivery(id) { calls.push(['beginDelivery', id]); return true; },
     complete(id) { calls.push(['complete', id]); return {}; },
-    fail(id, e) { calls.push(['fail', id, e]); return {}; },
+    fail(id, e, stop = false) { calls.push(['fail', id, e, stop]); return {}; },
     rejected: () => ({}),
     ignore(peer, reason) { calls.push(['ignore', peer, reason]); return {}; },
     reportError(peer, e) { calls.push(['error', peer, e]); }

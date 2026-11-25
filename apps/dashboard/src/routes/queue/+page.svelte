@@ -11,9 +11,9 @@
         <td>{j.id}</td><td><a href="/pairs/{j.pair_id}">{j.pair_id}</a></td><td>{j.kind}</td>
         <td>{j.status}{#if j.error}<div class="err">{j.error}</div>{/if}</td><td>{j.reply_text ?? ''}</td>
         <td style="white-space:nowrap">
-          {#if j.status === 'failed'}
+          {#if j.status === 'failed' && j.kind !== 'repair' && !j.delivery_stopped}
             <form method="POST" action="?/retry"><input type="hidden" name="id" value={j.id} /><button class="ghost">tekrar dene</button></form>
-          {:else if j.status !== 'done'}
+          {:else if j.status === 'pending' || j.status === 'processing'}
             <form method="POST" action="?/cancel"><input type="hidden" name="id" value={j.id} /><button class="ghost">iptal</button></form>
           {/if}
         </td>

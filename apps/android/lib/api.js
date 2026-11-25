@@ -29,17 +29,18 @@ function createApi(opts) {
         var r = call('GET', '/api/ext/control?host=' + encodeURIComponent(host) + '&v=' + encodeURIComponent(opts.version || ''), null, 5000);
         var h = r.ok && r.data ? r.data.host : null;
         value = h && String(h.sugoId) === host && typeof h.active === 'boolean'
-          ? { synced: true, active: h.active, revision: h.revision, name: h.name }
-          : { synced: false, active: false, error: r.error || 'geçersiz profil durumu' };
+          ? { synced: true, active: h.active, revision: h.revision, name: h.name, network: h.network }
+          : { synced: false, active: false, missing: r.status === 404, error: r.error || 'geçersiz profil durumu' };
       } catch (e) { value = { synced: false, active: false, error: String(e && e.message || e) }; }
       controlCache = { at: now(), value: value };
       return value;
     },
     state: function (body) { try { call('POST', '/api/ext/state', Object.assign({ hostSugoId: host, version: opts.version }, body), 5000); } catch (e) { /* panel durumu kritik değil */ } },
     ingest: function (body) { return must(call('POST', '/api/ext/ingest', Object.assign({ hostSugoId: host }, body), 180000), 'ingest'); },
-    nextJob: function (o) { return must(call('POST', '/api/ext/jobs/next', { host: host, replyOnly: !!o.replyOnly, visiblePeerIds: o.visiblePeerIds || [] }), 'jobs/next').job || null; },
+    nextJob: function (o) { return must(call('POST', '/api/ext/jobs/next', { host: host, replyOnly: !!o.replyOnly, android: true, visiblePeerIds: o.visiblePeerIds || [] }), 'jobs/next').job || null; },
+    beginDelivery: function (id) { return must(call('POST', '/api/ext/jobs/' + id + '/begin-android'), 'begin-android').reserved === true; },
     complete: function (id) { return must(call('POST', '/api/ext/jobs/' + id + '/complete'), 'complete'); },
-    fail: function (id, error) { return must(call('POST', '/api/ext/jobs/' + id + '/fail', { error: String(error) }), 'fail'); },
+    fail: function (id, error, stopRetry) { return must(call('POST', '/api/ext/jobs/' + id + '/fail', { error: String(error), stopRetry: stopRetry === true }), 'fail'); },
     rejected: function (id, text) { return must(call('POST', '/api/ext/jobs/' + id + '/rejected', { text: text }), 'rejected'); },
     /** Profili sunucuda oluşturur (yoksa mevcut bir personadan kopyalanır) veya adını günceller; `hostSugoId` yerine `sugoId` verilebilir. */
     syncHost: function (sugoId, name) { return must(call('POST', '/api/ext/hosts/' + encodeURIComponent(String(sugoId)) + '/sync', { name: name || '' }), 'sync'); },

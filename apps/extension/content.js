@@ -478,7 +478,13 @@ async function clearPending(cfg, peerId) {
 const rowSignature = (r) => r.innerText.replace(/\s+/g, ' ').trim();
 const rowPreview = (r) => r.querySelector(SEL.preview)?.innerText ?? rowSignature(r);
 const isOnlineRow = (r) => !!r.querySelector(SEL.onlinePrefix) || isOnlineNotice(rowPreview(r));
-const isMatchRow = (r) => !isOnlineRow(r) && (!!r.querySelector(SEL.matchPrefix) || /eşleşme/i.test(rowPreview(r)));
+const isMatchRow = (r) => !!r.querySelector(SEL.matchPrefix) || /^\[(?:eşleşme|match)\]/iu.test(rowPreview(r).trim());
+function matchDetails(row) {
+  if (!isMatchRow(row)) return { match: false };
+  const badge = row.querySelector(SEL.matchPrefix);
+  const eventId = badge?.getAttribute('data-event-id') || badge?.getAttribute('data-message-id');
+  return { match: true, ...(eventId ? { matchEventId: eventId } : {}) };
+}
 function hasPendingNormal(rows) {
   return rows.some((r) => {
     const id = r.getAttribute('data-message-conversation-id');
@@ -567,6 +573,7 @@ async function ingestUnread(cfg, row = nextRow()) {
   setState('sohbet okuyor', String(peerSugoId));
   await rememberPending(cfg, peerSugoId, Date.now() + 15000);
   const peerName = row.querySelector(SEL.name)?.innerText.trim() ?? '';
+  const match = matchDetails(row);
   let failedJob = false;
   let emptyAttempt = false;
   try {
@@ -593,7 +600,7 @@ async function ingestUnread(cfg, row = nextRow()) {
     if (!messages.length && !dialog.querySelector(`${SEL.userCard}, ${SEL.system}`)) {
       throw new Error('sohbet açıldı ama okunabilir mesaj yüklenmedi');
     }
-    const body = { hostSugoId: cfg.hostSugoId, peerSugoId, peerName, voiceEnabled: voiceEnabled(), messages, ...(isOnlineRow(row) || endsWithOnlineNotice(dialog) ? { online: true } : {}), ...(!messages.length || followOnly ? { emptyChat: true } : {}) };
+    const body = { hostSugoId: cfg.hostSugoId, peerSugoId, peerName, voiceEnabled: voiceEnabled(), messages, ...match, ...(!match.match && (isOnlineRow(row) || endsWithOnlineNotice(dialog)) ? { online: true } : {}), ...(!messages.length || followOnly ? { emptyChat: true } : {}) };
     let res = await call({ path: '/api/ext/ingest', method: 'POST', body });
     if (res?.ok && !res.data?.job && messages.at(-1)?.dir === 'in' && !followOnly) {
       // DOM'da son söz karşı taraftaysa eski "işlendi" kaydı yüzünden cevapsız bırakma.
@@ -610,7 +617,7 @@ async function ingestUnread(cfg, row = nextRow()) {
     // Ingest cevabı hazırlamayı bekler; hazır işi aynı sohbet açıkken kilitleyip gönder.
     if (res?.ok && res.data?.job?.status === 'pending') {
       // Boş sohbette yalnız bu sohbetin selamı alınır; böylece başka sohbetin işi araya girmez ve selam açık sohbette gider.
-      const next = body.emptyChat ? await getNextJob(cfg, false, [peerSugoId]) : await getNextJob(cfg, res.data.job.kind !== 'welcome' && messages.length > 0);
+      const next = body.emptyChat || body.match ? await getNextJob(cfg, false, [peerSugoId]) : await getNextJob(cfg, res.data.job.kind !== 'welcome' && messages.length > 0);
       if (next.job) {
         await runJob(cfg, next.job, { peerSugoId, dialog });
         return true;
@@ -804,6 +811,31 @@ async function backToMessages() {
   }
 }
 
+let nextRoamCheckAt = 0;
+let roamHost;
+function pollRoam(cfg) {
+  if (roamHost !== cfg.hostSugoId) {
+    roamHost = cfg.hostSugoId;
+    nextRoamCheckAt = 0;
+  }
+  if (Date.now() < nextRoamCheckAt) return null;
+  nextRoamCheckAt = Date.now() + 10000;
+  return chrome.runtime.sendMessage({ type: 'roam-check', hostSugoId: cfg.hostSugoId }).catch(() => null);
+}
+
+async function roamWhileIdle(check) {
+  const stepAt = await check;
+  if (!Number.isSafeInteger(stepAt) || !location.pathname.startsWith('/messages')) return;
+  const rows = conversationRows();
+  const unread = rows.some((row) => {
+    const id = row.getAttribute('data-message-conversation-id');
+    if (skipped.has(id) || !row.querySelector(SEL.unread)) return false;
+    return handled.get(id)?.sig !== rowSignature(row);
+  });
+  if (unread || hasPendingNormal(rows)) return;
+  await chrome.runtime.sendMessage({ type: 'roam-apply', stepAt }).catch(() => {});
+}
+
 async function tick() {
   if (busy) return false;
   if (!location.pathname.startsWith('/messages')) return await backToMessages();
@@ -811,6 +843,7 @@ async function tick() {
   try {
     const cfg = await getConfig();
     if (!cfg.enabled || !cfg.hostSugoId || !cfg.apiKey) return false;
+    const roam = pollRoam(cfg);
     await loadPending(cfg);
     await heartbeat(cfg);
     // Sürekli normal trafik varken de her cevaptan sonra (en erken 5 sn arayla) bir eşleşme açılır.
@@ -834,9 +867,9 @@ async function tick() {
     if (match) return await ingestUnread(cfg, match);
     const online = nextRow({ matches: false, online: true });
     if (online) return await ingestUnread(cfg, online);
-    // Boştayken Ana sayfa/Yakınlarda gezintisi, hi gönderme ve sayfa değiştirme yapılmaz; yalnız Mesajlar'da beklenir.
     if (await loadMoreRows()) return true;
     setState('boşta', 'yeni mesaj/eşleşme bekleniyor');
+    if (roam) await roamWhileIdle(roam);
     return await humanIdle();
   } catch (e) {
     if (/Extension context invalidated/i.test(e?.message ?? '')) { staleContext(); return false; }

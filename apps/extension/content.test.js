@@ -54,16 +54,39 @@ describe('alıntılı mesajları okuma', () => {
   });
 });
 
-async function turn({ peerSugoId = 'peer', status = 'pending', connected = true, queued = true } = {}) {
+describe('boşta konum hareketi', () => {
+  it('konum yanıtını beklerken gelen görünür mesajı önce işler', async () => {
+    const sendMessage = vi.fn(async () => true);
+    const row = {
+      innerText: 'yeni mesaj',
+      getAttribute: () => '123',
+      querySelector: () => ({}),
+    };
+    const context = createContext({
+      location: { pathname: '/messages' },
+      document: { querySelectorAll: () => [row] },
+      chrome: { runtime: { onMessage: { addListener() {} }, sendMessage } },
+    });
+    runInContext(script, context);
+    await runInContext('roamWhileIdle(Promise.resolve(1234))', context);
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(runInContext("handled.set('123', { sig: 'yeni mesaj', at: Date.now() }).has('123')", context)).toBe(true);
+    await runInContext('roamWhileIdle(Promise.resolve(1234))', context);
+    expect(sendMessage).toHaveBeenCalledWith({ type: 'roam-apply', stepAt: 1234 });
+  });
+});
+
+async function turn({ peerSugoId = 'peer', status = 'pending', connected = true, queued = true, match = false, requests = [] } = {}) {
   const events = [];
   const dialog = { isConnected: connected, querySelector: () => null, querySelectorAll: () => [] };
-  const row = { innerText: 'mesaj', getAttribute: () => 'peer', querySelector: () => null };
+  const row = { innerText: match ? '[Eşleşme] sohbet' : 'mesaj', getAttribute: () => 'peer', querySelector: () => null };
   const context = createContext({
     events, dialog, row, console: { info() {}, warn() {} }, setTimeout, clearTimeout,
     document: { querySelectorAll: () => [row] },
     chrome: { storage: { local: { async get() { return {}; }, async set() {}, async remove() {} } }, runtime: {
       onMessage: { addListener() {} },
       async sendMessage(request) {
+        requests.push(request);
         if (request.path === '/api/ext/ingest') {
           events.push('ingest');
           return { ok: true, data: { job: { status } } };
@@ -83,7 +106,8 @@ async function turn({ peerSugoId = 'peer', status = 'pending', connected = true,
     rowFor = (id) => { events.push('row:' + id); return row; };
     openChat = async () => { events.push('open'); return dialog; };
     leaveChat = async () => { events.push('leave'); };
-    parseMessages = () => [{ dir: 'in', text: 'merhaba' }];
+    parseMessages = () => [{ dir: '${match ? "out" : "in"}', text: 'merhaba' }];
+    endsWithOnlineNotice = () => ${match};
     voiceEnabled = () => false;
     typeAndSend = async (target, text) => {
       if (target !== dialog || text !== 'selam') throw new Error('yanlış hedef veya metin');
@@ -96,6 +120,13 @@ async function turn({ peerSugoId = 'peer', status = 'pending', connected = true,
 }
 
 describe('okunan sohbete doğrudan cevap', () => {
+  it('eski giden mesajı olan eşleşmeyi çevrim içi bildirimden ayırır ve işi aynı sohbet için alır', async () => {
+    const requests = [];
+    expect(await turn({ match: true, requests })).toContain('send');
+    expect(requests[0].body).toMatchObject({ match: true, messages: [{ dir: 'out', text: 'merhaba' }] });
+    expect(requests[0].body).not.toHaveProperty('online');
+    expect(requests[1].body).toMatchObject({ replyOnly: false, visiblePeerIds: ['peer'] });
+  });
   it('Bildirimlere geçmeden ve sohbeti yeniden açmadan hazır cevabı gönderir', async () => {
     expect(await turn()).toEqual(['open', 'ingest', 'claim', 'send', 'complete', 'row:peer', 'leave']);
   });

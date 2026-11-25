@@ -124,6 +124,15 @@ function gotoKnown(ui) {
   return null;
 }
 
+/** Sugo ön planda değilse başlatır ve ön plana gelene kadar bekler; gelmezse false döner. */
+function openSugo(ui, timeout) {
+  if (ui.inApp()) return true;
+  try { if (ui.launch() === false) return false; } catch (e) { return false; }
+  var end = ui.now() + timeout;
+  while (!ui.inApp() && ui.now() < end) ui.sleep(250);
+  return ui.inApp();
+}
+
 /** "Ben" sekmesinden kendi takma adını ve sugo id'sini okur (kendi profili açılır, sonra Mesajlar'a dönülür). */
 function readSelf(ui) {
   var cur = screenOf(ui);
@@ -164,4 +173,4 @@ function gotoList(ui) {
   return waitForScreen(ui, 'list', 4000);
 }
 
-module.exports = { profileData: profileData, readSelf: readSelf, gotoKnown: gotoKnown, sameName: sameName, gotoList: gotoList, waitForScreen: waitForScreen, backTo: backTo, openChat: openChat, readPeerId: readPeerId, screenOf: screenOf };
+module.exports = { openSugo: openSugo, profileData: profileData, readSelf: readSelf, gotoKnown: gotoKnown, sameName: sameName, gotoList: gotoList, waitForScreen: waitForScreen, backTo: backTo, openChat: openChat, readPeerId: readPeerId, screenOf: screenOf };

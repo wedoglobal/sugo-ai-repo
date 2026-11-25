@@ -1,22 +1,61 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { validateProfile } from './network-model.js';
 const event = () => ({ addListener: vi.fn() });
-let local, session, chrome, networkMessage;
+let local, session, chrome, networkMessage, applyRoam;
 const p = (domain = 'sugo.live') => validateProfile({ domain, gps: { enabled: true, latitude: 12, longitude: 23 }, proxy: { enabled: true, ip: '1.2.3.4', port: 80, auth: true, username: 'u', password: 'p' } });
 beforeEach(async () => {
   vi.resetModules(); local = {}; session = {};
   const storage = (data) => ({ get: vi.fn(async (key) => key === null ? { ...data } : typeof key === 'string' ? { [key]: data[key] } : Object.fromEntries(key.map((k) => [k, data[k]]))), set: vi.fn(async (value) => Object.assign(data, structuredClone(value))), remove: vi.fn(async (key) => { delete data[key]; }) });
   chrome = {
     storage: { local: storage(local), session: storage(session) },
-    tabs: { query: vi.fn(async () => [{ id: 1, url: 'https://sugo.live' }, { id: 2, url: 'https://other.test' }]), onUpdated: event(), onRemoved: event() },
+    tabs: { query: vi.fn(async () => [{ id: 1, url: 'https://sugo.live' }, { id: 2, url: 'https://other.test' }]), get: vi.fn(async (id) => ({ id, url: 'https://sugo.live/messages' })), onUpdated: event(), onRemoved: event() },
     contentSettings: { location: { clear: vi.fn(async () => {}), set: vi.fn(async () => {}), get: vi.fn(async () => ({ setting: 'allow' })) } },
     proxy: { settings: { get: vi.fn(async () => ({ levelOfControl: 'controllable_by_this_extension' })), set: vi.fn(async () => {}), clear: vi.fn(async () => {}) }, onProxyError: event() },
     debugger: { attach: vi.fn(async () => {}), detach: vi.fn(async () => {}), sendCommand: vi.fn(async () => {}), getTargets: vi.fn(async () => []), onDetach: event() },
     webRequest: { onAuthRequired: event(), onCompleted: event(), onErrorOccurred: event() },
   };
   vi.stubGlobal('chrome', chrome);
-  ({ networkMessage } = await import('./network.js'));
+  ({ networkMessage, applyRoam } = await import('./network.js'));
   await networkMessage({ action: 'read', host: 'host' });
+});
+
+describe('boşta geçici GPS hareketi', () => {
+  const host = { id: 'host', sugoId: '123' };
+  const move = { stepAt: 1234, center: { latitude: 12, longitude: 23 }, latitude: 12.1, longitude: 23.1 };
+  const coords = { latitude: 12.1, longitude: 23.1, accuracy: 20 };
+  const apply = (expiresAt = Date.now() + 1000) => applyRoam(1, 'sugo.live', host, move, expiresAt);
+  beforeEach(async () => {
+    local.hostSugoId = host.sugoId;
+    await networkMessage({ action: 'replace', host: host.id, profiles: [p()] });
+    chrome.debugger.sendCommand.mockClear();
+  });
+  it('dilimi bir kez uygular ve sekme yeniden yüklenince son konumu korur', async () => {
+    expect(await apply()).toBe(true);
+    expect(await apply()).toBe(true);
+    expect(chrome.debugger.sendCommand).toHaveBeenCalledExactlyOnceWith({ tabId: 1 }, 'Emulation.setGeolocationOverride', coords);
+    chrome.tabs.onUpdated.addListener.mock.calls[0][0](1, { status: 'loading' }, { id: 1, url: 'https://sugo.live/messages' });
+    await networkMessage({ action: 'read', host: host.id });
+    expect(chrome.debugger.sendCommand).toHaveBeenLastCalledWith({ tabId: 1 }, 'Emulation.setGeolocationOverride', coords);
+    expect(local.networkProfiles.hosts.host[0].gps.latitude).toBe(12);
+  });
+  it('başarısız GPS hareketini aynı dilimde tekrar dener', async () => {
+    chrome.debugger.sendCommand.mockRejectedValueOnce(new Error('Geçici hata'));
+    expect(await apply()).toBe(false);
+    expect(session['gpsRoam:sugo.live']).toBeUndefined();
+    expect(await apply()).toBe(true);
+    expect(chrome.debugger.sendCommand).toHaveBeenCalledTimes(2);
+  });
+  it('merkez ve profil değişince eski hedefi bırakır, süresi dolmuş hedefi uygulamaz', async () => {
+    expect(await apply(Date.now() - 1)).toBe(false);
+    expect(await apply()).toBe(true);
+    const next = p();
+    next.gps.latitude = 45;
+    await networkMessage({ action: 'replace', host: host.id, profiles: [next] });
+    expect(await apply()).toBe(false);
+    expect(session['gpsRoam:sugo.live']).toBeUndefined();
+    await networkMessage({ action: 'replace', host: 'other', profiles: [p()] });
+    expect(await apply()).toBe(false);
+  });
 });
 describe('Chrome ağ yönetimi', () => {
   it('ilk açılışta proxy veya debugger ayarına dokunmaz', () => {

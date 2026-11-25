@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { db, must } from '$lib/server/deps.js';
+import { roamDomains, roamTarget } from '$lib/server/location-roam.js';
 
 const lastVersion = new Map();
 
@@ -30,5 +31,14 @@ export async function GET({ url }) {
   // Dinlenen eklenti panelden "şimdi başlat" komutunu yalnız `cmd=1` ile sorar.
   let command = null;
   if (url.searchParams.get('cmd') === '1') command = must(await db().from('app_settings').select('value').eq('key', `ext_cmd:${id}`).maybeSingle())?.value ?? null;
-  return json({ command, host: { id: host.id, sugoId: host.sugo_id, name: host.name, active: host.active, revision: host.updated_at, network: host.network_profiles ?? [] } }, { headers: { 'cache-control': 'no-store' } });
+  const domain = url.searchParams.get('roam');
+  let roam;
+  if (roamDomains.has(domain)) {
+    roam = null;
+    if (host.active && host.network_profiles?.some((p) => p.domain === domain && p.gps?.enabled)) {
+      const { data, error } = await db().rpc('poll_location_roam', { p_host_id: host.id, p_domain: domain });
+      if (!error) roam = await roamTarget(host.id, domain, data);
+    }
+  }
+  return json({ command, roam, host: { id: host.id, sugoId: host.sugo_id, name: host.name, active: host.active, revision: host.updated_at, network: host.network_profiles ?? [] } }, { headers: { 'cache-control': 'no-store' } });
 }

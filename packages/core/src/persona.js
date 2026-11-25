@@ -175,9 +175,10 @@ function replyHistory(history) {
  * @param {Date} p.now
  * @param {string} p.routine  haftalık rutinden şu anki yer/aktivite
  * @param {string[]} p.rules  tüm karakterler için ortak genel kurallar
+ * @param {boolean} [p.match]  Sugo yeni bir eşleşme bildirdi.
  * @param {{when:string,rule:string}[]} p.contextRules  bu sohbette geçerli (eşleşmiş) bağlam kuralları
  */
-export function buildReplyMessages({ kind, persona, permanent = {}, disclosed = {}, temp = [], history = [], unread = [], avoid = [], knowledge = [], now = new Date(), extraRule = '', routine = '', rules = [], contextRules = [] }) {
+export function buildReplyMessages({ kind, match = false, persona, permanent = {}, disclosed = {}, temp = [], history = [], unread = [], avoid = [], knowledge = [], now = new Date(), extraRule = '', routine = '', rules = [], contextRules = [] }) {
   const shareable = persona.facts.filter((f) => f.shareable);
   const undisclosed = shareable.filter((f) => !disclosed[factField(f.label)]);
   const told = shareable.filter((f) => disclosed[factField(f.label)]);
@@ -185,7 +186,9 @@ export function buildReplyMessages({ kind, persona, permanent = {}, disclosed = 
 
   const system = [
     'gerçek bir kullanıcı gibi yazan karakterin tek mesajını yaz. Yalnız mesajın kendisi: Türkçe, en fazla 300 karakter, tırnak ve açıklama yok.',
-    kind === 'welcome'
+    kind === 'welcome' && match
+      ? 'Sugo yeni bir eşleşme bildirdi. Kısa, sıcak bir selamla sohbeti aç. Önceki bir mesaja yanıt gelmiş gibi konuşma ve önceki selamı tekrar etme.'
+      : kind === 'welcome'
       ? 'Konuşma boş, ilk mesajı sen at: kısa ve her seferinde farklı bir selam.'
       : 'Yeni mesajlara tek mesajda cevap ver. Soru zorunlu değil; sorarsan tek soru sor.',
     ...LEVEL_FIELDS.map(([key]) => LEVEL_RULES[key][persona[key]]),
@@ -215,7 +218,7 @@ export function buildReplyMessages({ kind, persona, permanent = {}, disclosed = 
     persona.examples.length ? `Konuşma tarzı örnekleri:\n${lineList(persona.examples.slice(0, REPLY_EXAMPLES))}` : '',
     avoid.length ? `Şunlara benzeyen mesajlar yazma (daha önce kullanıldı):\n${lineList(avoid)}` : '',
     history.length ? `Önceki konuşma (eski -> yeni):\n${replyHistory(history)}` : '',
-    kind === 'reply' ? `Cevaplanacak yeni mesajlar:\n${lineList(unread)}` : 'Konuşma boş. İlk mesajı sen at.',
+    kind === 'reply' ? `Cevaplanacak yeni mesajlar:\n${lineList(unread)}` : match ? 'Yeni eşleşmeye selam yaz.' : 'Konuşma boş. İlk mesajı sen at.',
   ].filter(Boolean).join('\n\n');
 
   return [{ role: 'system', content: system }, { role: 'user', content: user }];

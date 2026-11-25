@@ -42,8 +42,22 @@ function createUi() {
     swipe: function (x1, y1, x2, y2, ms) { swipe(Math.round(x1), Math.round(y1), Math.round(x2), Math.round(y2), ms); },
     sleep: function (ms) { sleep(ms); },
     now: function () { return Date.now(); },
-    inApp: function () { return currentPackage() === PKG; },
-    launch: function () { app.launchPackage(PKG); }
+    /** Önce etkin pencerenin paketine bakılır (anlık ve güvenilir); olmazsa currentPackage() kullanılır. */
+    foreground: function () {
+      var root = auto.rootInActiveWindow;
+      var pkg = root ? String(root.packageName() || '') : '';
+      return pkg || String(currentPackage() || '');
+    },
+    inApp: function () { return this.foreground() === PKG; },
+    launch: function () {
+      if (android.os.Build.VERSION.SDK_INT >= 33) {
+        // Android 13+ can launch the package even when a raw Builder APK cannot query it.
+        var sender = context.getPackageManager().getLaunchIntentSenderForPackage(PKG);
+        sender.sendIntent(context, 0, null, null, null);
+        return true;
+      }
+      return !!app.launchPackage(PKG);
+    }
   };
 }
 

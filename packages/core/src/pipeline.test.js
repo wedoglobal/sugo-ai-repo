@@ -325,4 +325,37 @@ describe.skipIf(!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)('pipeline (
     const reply = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: p, messages: [{ dir: 'in', text: 'selam', ts: '1' }] });
     expect(reply.job.kind).toBe('reply');
   });
+
+  it('çevrim içi bildirime hazır karşılama hazırlar, eşleşmeye öncelik verir ve tekrar selamı engeller', async () => {
+    const onlinePeer = `online-${Date.now()}`;
+    const matchPeer = `match-${Date.now()}`;
+    const now = new Date();
+    now.setUTCHours(6, 0, 0, 0);
+    const noLlm = { ...deps, now: () => now, random: () => 0, llm: () => { throw new Error('hazır şablon LLM çağırdı'); } };
+    const online = { hostSugoId: HOST, peerSugoId: onlinePeer, online: true, messages: [] };
+    const greeting = await ingest(db, noLlm, online);
+    expect(greeting.job).toMatchObject({ kind: 'welcome', status: 'pending' });
+    expect((await ingest(db, noLlm, online)).job.id).toBe(greeting.job.id);
+    expect(await nextJob(db, HOST, undefined, { replyOnly: true, visiblePeerIds: [onlinePeer] })).toBeNull();
+    const match = await ingest(db, deps, { hostSugoId: HOST, peerSugoId: matchPeer, emptyChat: true, messages: [] });
+    const visiblePeerIds = [onlinePeer, matchPeer];
+    const top = await nextJob(db, HOST, undefined, { visiblePeerIds });
+    expect(top.id).toBe(match.job.id);
+    await completeJob(db, top.id);
+    const queued = await nextJob(db, HOST, undefined, { visiblePeerIds });
+    expect(queued).toMatchObject({ id: greeting.job.id, kind: 'welcome', text: 'günaydın, nasılsın?' });
+    await completeJob(db, queued.id);
+    expect((await ingest(db, noLlm, online)).job).toBeNull();
+  });
+
+  it('asıl gelen mesaj çevrim içi bildirimden ve kuyruğa alınmış selamdan önceliklidir', async () => {
+    const peerSugoId = `online-reply-${Date.now()}`;
+    const input = { hostSugoId: HOST, peerSugoId, messages: [{ dir: 'in', text: 'Partner çevrim içi oldu.' }] };
+    const greeting = await ingest(db, deps, input);
+    expect(greeting.job.kind).toBe('welcome');
+    const reply = await ingest(db, deps, { ...input, messages: [...input.messages, { dir: 'in', text: 'naber?' }] });
+    expect(reply.job).toMatchObject({ id: greeting.job.id, kind: 'reply' });
+    const { data } = await db.from('jobs').select('online_greeting').eq('id', reply.job.id).single();
+    expect(data.online_greeting).toBe(false);
+  });
 });

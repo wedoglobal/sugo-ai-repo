@@ -77,3 +77,19 @@ describe('gezinme doğrulaması', () => {
     expect(wrapped.calls).toEqual(['id_main_bottomtab_conv']);
   });
 });
+
+describe('openSugo', () => {
+  const fake = (opts) => {
+    let t = 0; let inApp = opts.inApp; let launched = 0;
+    return {
+      get launched() { return launched; },
+      inApp: () => { if (opts.appears && launched && t >= opts.appears) inApp = true; return inApp; },
+      launch() { launched++; if (opts.throws) throw new Error('x'); return opts.result; },
+      sleep(ms) { t += ms; }, now: () => t
+    };
+  };
+  it('zaten açıksa başlatmaz', () => { const ui = fake({ inApp: true }); expect(nav.openSugo(ui, 1000)).toBe(true); expect(ui.launched).toBe(0); });
+  it('başlatır ve ön plana gelmesini bekler', () => { const ui = fake({ inApp: false, appears: 500, result: true }); expect(nav.openSugo(ui, 2000)).toBe(true); expect(ui.launched).toBe(1); });
+  it('ön plana gelmezse false döner', () => { expect(nav.openSugo(fake({ inApp: false, result: true }), 1000)).toBe(false); });
+  it('başlatma hatasında false döner', () => { expect(nav.openSugo(fake({ inApp: false, throws: true }), 1000)).toBe(false); });
+});

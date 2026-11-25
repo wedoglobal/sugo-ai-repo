@@ -11,6 +11,22 @@ async function localConfig() {
   const c = await chrome.storage.local.get(['baseUrl', 'apiKey', 'hostSugoId', 'enabled']);
   return { ...c, baseUrl: !c.baseUrl || c.baseUrl === LEGACY_URL ? defaults.baseUrl : c.baseUrl, apiKey: c.apiKey || defaults.apiKey };
 }
+
+export async function checkRoam(hostSugoId, domain) {
+  const c = await localConfig();
+  if (!c.apiKey || String(c.hostSugoId) !== String(hostSugoId)) return null;
+  const query = new URLSearchParams({ host: c.hostSugoId, roam: domain });
+  const res = await fetch(`${c.baseUrl.replace(/\/$/, '')}/api/ext/control?${query}`, {
+    headers: { authorization: `Bearer ${c.apiKey}` }, cache: 'no-store', signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) return null;
+  const { host, roam } = await res.json();
+  const validPoint = (p) => Number.isFinite(p?.latitude) && Number.isFinite(p?.longitude)
+    && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180;
+  if (!host?.id || host.active !== true || String(host.sugoId) !== String(hostSugoId) ||
+      !validPoint(roam) || !validPoint(roam.center) || !Number.isSafeInteger(roam.stepAt)) return null;
+  return { host, roam };
+}
 /** Panelde kaydedilen GPS/proxy profillerini bu Chrome'a uygular; yalnız içerik değişince veya yerel kayıt farklıysa çalışır. */
 async function syncNetwork(host) {
   const apply = globalThis.veloraNetworkMessage;

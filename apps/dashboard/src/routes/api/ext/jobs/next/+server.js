@@ -1,18 +1,20 @@
 import { json } from '@sveltejs/kit';
 import { NotFoundError, nextJob } from '@sugo/core';
 import { db, deps } from '$lib/server/deps.js';
+import { continueRepairAnalysis, webRepairClient } from '$lib/server/conversation-repair.js';
 
-export async function GET({ url }) {
+export async function GET({ url, platform }) {
   const host = url.searchParams.get('host');
   if (!host) return json({ error: 'host gerekli' }, { status: 400 });
   try {
+    continueRepairAnalysis(platform);
     return json({ job: await nextJob(db(), host, deps(), { replyOnly: url.searchParams.get('replyOnly') === '1' }) });
   } catch (e) {
     return json({ error: e.message }, { status: e instanceof NotFoundError ? 404 : 500 });
   }
 }
 
-export async function POST({ request }) {
+export async function POST({ request, platform }) {
   const body = await request.json().catch(() => null);
   const host = String(body?.host ?? body?.hostSugoId ?? '').trim();
   if (!host) return json({ error: 'host gerekli' }, { status: 400 });
@@ -25,7 +27,10 @@ export async function POST({ request }) {
       .map((id) => String(id).trim()).filter((id) => /^\d{1,30}$/.test(id)))].slice(0, 1000)
     : null;
   try {
-    return json({ job: await nextJob(db(), host, deps(), { replyOnly: body.replyOnly === true, visiblePeerIds }) });
+    continueRepairAnalysis(platform);
+    const dependencies = deps();
+    const clientDeps = webRepairClient(request) ? { ...dependencies, repairClient: true } : dependencies;
+    return json({ job: await nextJob(db(), host, clientDeps, { replyOnly: body.replyOnly === true, visiblePeerIds, ...(body.android === true ? { android: true } : {}) }) });
   } catch (e) {
     return json({ error: e.message }, { status: e instanceof NotFoundError ? 404 : 500 });
   }
