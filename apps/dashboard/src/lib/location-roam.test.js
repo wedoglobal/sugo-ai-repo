@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isRoamLand, roamTarget } from './server/location-roam.js';
+import { isRoamLand, roamStatus, roamTarget } from './server/location-roam.js';
 
 const start = Date.parse('2026-11-25T09:00:00Z');
 const minute = 60_000;
@@ -46,5 +46,20 @@ describe('Sugo konum gezintisi', () => {
     }
     expect(isRoamLand(41.073, 28.825)).toBe(true);
     expect(await poll(10, start, { latitude: 35, longitude: -40 })).toBeNull();
+  });
+
+  it('panel son kayıtlı kontroldeki hedefi gösterir ve yeni mesajla beklemeye döner', async () => {
+    const host = { id: 'host', active: true };
+    const profile = { domain: 'sugo.live', gps: { enabled: true, ...istanbul } };
+    const connection = { connected_at: date(start), seen_at: date(start + 11 * minute) };
+    const now = start + 12 * minute;
+    expect(await roamStatus(host, profile, connection, now)).toMatchObject({
+      state: 'moving', target: await poll(11), seenAt: connection.seen_at,
+    });
+    expect(await roamStatus({ ...host, last_incoming_at: date(now) }, profile, connection, now)).toMatchObject({
+      state: 'waiting', firstAt: now + 10 * minute,
+    });
+    expect(await roamStatus(host, profile, connection, now + 3 * minute)).toMatchObject({ state: 'offline' });
+    expect(await roamStatus(host, profile, { ...connection, seen_at: date(start + 9 * minute) }, now)).toMatchObject({ state: 'awaiting_poll' });
   });
 });

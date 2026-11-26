@@ -38,11 +38,17 @@ Rozet bir ikon, metni/açıklaması yok. Profil sayfasında rozet kökü (`id_ge
 Chrome'da id satırın özniteliğidir; Android'de yok. Liste satırının avatarına dokunmak doğrudan profile gider, `uidView` id'yi verir, `backBtn` listeye döner (`nav.readPeerId`).
 
 ## Tuzaklar
+- Ekran dışındaki okunmamışlar `id_conv_tab_unread` (Okunmamış) sekmesinden bulunur: alt sekme rozeti doluysa en çok 15 sn'de bir sekmeye geçilir (`nav.selectListTab`, `selected` doğrulanır), işler bitince Hepsi'ne dönülür. Sekme görünmüyorsa eski sayfa taraması çalışır.
 - `ll_chat_item` sorgusu ekran dışındaki ViewPager sayfalarının (Çevrimiçi sekmesi) kopyalarını da döndürür; görünürlük sınırlarla süzülür (`tree.isVisible`).
 - Kısmen görünen satıra dokunmak yanlış yere gidebilir; `fullyVisible` kontrol edilir.
 
+## Elmas ve giden balon durumu
+- Giden balonun altındaki rozet `id_chating_msg_diamond_tv` ("x60"); `parse.chatMessageRows` bunu `diamonds` olarak okur, ingest'e giden mesajlarda taşınır. Gelen balonda `id_chating_msg_diamond_ll` boş ikondur (0).
+- Durum simgesi `chatting_state_iv` teslim edilmiş giden balonda da (yeşil ✓) tıklanabilir olarak kalır; hata ünlemiyle ağaçta ayırt edilemez. Elmas rozeti olan ya da altında karşı tarafın mesajı bulunan balon teslim edilmiş sayılır; simge yalnız son giden balonda başarısız/belirsiz anlamına gelir. Gerçek bir ünlem örneği alınırsa ayrım buradan netleştirilmeli.
+- Listede görünen `dataFrame1` ("x560", `diamondIconView`) sohbet toplamı değildir (sohbetteki rozetler toplamı 80); anlamı bilinmiyor, okunmuyor.
+
 ## Henüz bilinmeyenler (keşif sürüyor)
-- Gelen mesaj balonunun yapısı (yalnız giden örnek var), görsel/ses/hediye balonları, gönderim hatası göstergesi (`chatting_state_iv`), "reddedildi/engellendi" sistem metni.
+- Görsel/ses/hediye balonları, "reddedildi/engellendi" sistem metni, hata ünlemi düğümünün ayırt edici özelliği.
 - "Merhaba de" ve Yakınlarda akışı (selam gönderme).
 - Android 10 gerçek doğrulaması: elde yalnız Android 13 cihaz var.
 

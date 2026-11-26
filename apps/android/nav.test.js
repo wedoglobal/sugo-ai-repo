@@ -93,3 +93,22 @@ describe('openSugo', () => {
   it('ön plana gelmezse false döner', () => { expect(nav.openSugo(fake({ inApp: false, result: true }), 1000)).toBe(false); });
   it('başlatma hatasında false döner', () => { expect(nav.openSugo(fake({ inApp: false, throws: true }), 1000)).toBe(false); });
 });
+
+describe('liste sekmesi seçimi', () => {
+  const dump = (sel) => tree.parseDump(['Root||||0,0,1080,2400', ` TextView|id_conv_tab_all|Hepsi||45,390,233,470|c${sel === 'all' ? '|s' : ''}`, ` TextView|id_conv_tab_unread|Okunmamış||1029,390,1080,470|c${sel === 'unread' ? '|s' : ''}`].join('\n'));
+  const mk = (switches) => {
+    let sel = 'all'; let clock = 0; const clicks = [];
+    return { clicks, ui: { snapshot: () => ({ root: dump(sel), size: { width: 1080, height: 2400 } }), click: (n) => { clicks.push(n.id); if (switches) sel = n.id === 'id_conv_tab_unread' ? 'unread' : 'all'; }, sleep: (ms) => { clock += ms; }, now: () => clock } };
+  };
+  it('seçili değilse dokunur ve seçilmesini bekler', () => {
+    const t = mk(true);
+    expect(nav.selectListTab(t.ui, 'id_conv_tab_unread')).toBe(true);
+    expect(t.clicks).toEqual(['id_conv_tab_unread']);
+  });
+  it('zaten seçiliyse dokunmaz; seçilmezse false döner', () => {
+    const a = mk(true);
+    expect(nav.selectListTab(a.ui, 'id_conv_tab_all')).toBe(true);
+    expect(a.clicks).toEqual([]);
+    expect(nav.selectListTab(mk(false).ui, 'id_conv_tab_unread')).toBe(false);
+  });
+});

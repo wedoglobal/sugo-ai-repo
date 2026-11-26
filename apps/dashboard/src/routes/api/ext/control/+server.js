@@ -4,6 +4,17 @@ import { roamDomains, roamTarget } from '$lib/server/location-roam.js';
 
 const lastVersion = new Map();
 
+async function pollRoam(hostId, { domain, gps }) {
+  try {
+    const { data, error } = await db().rpc('poll_location_roam', { p_host_id: hostId, p_domain: domain })
+      .abortSignal(AbortSignal.timeout(1500));
+    if (!error && data?.latitude === gps.latitude && data?.longitude === gps.longitude) {
+      return await roamTarget(hostId, domain, data);
+    }
+  } catch { /* Gezinti sorgusu başarısızsa kayıtlı konum ile kontrol yanıtı verilir. */ }
+  return null;
+}
+
 /** Profilin eklenti sürümü değiştiğinde app_settings.ext_versions geçmişine ekler; sürüm başına eşleşme karşılaştırması buna dayanır. */
 async function recordVersion(hostId, version) {
   if (lastVersion.get(hostId) === version) return;
@@ -29,16 +40,23 @@ export async function GET({ url }) {
   const version = url.searchParams.get('v') ?? '';
   if (/^\d{1,3}\.\d{1,3}\.\d{1,4}$/.test(version)) await recordVersion(host.id, version).catch(() => {});
   // Dinlenen eklenti panelden "şimdi başlat" komutunu yalnız `cmd=1` ile sorar.
+  const wantsCommand = url.searchParams.get('cmd') === '1';
   let command = null;
-  if (url.searchParams.get('cmd') === '1') command = must(await db().from('app_settings').select('value').eq('key', `ext_cmd:${id}`).maybeSingle())?.value ?? null;
+  if (wantsCommand) command = must(await db().from('app_settings').select('value').eq('key', `ext_cmd:${id}`).maybeSingle())?.value ?? null;
   const domain = url.searchParams.get('roam');
+  let network = host.network_profiles ?? [];
   let roam;
   if (roamDomains.has(domain)) {
-    roam = null;
-    if (host.active && host.network_profiles?.some((p) => p.domain === domain && p.gps?.enabled)) {
-      const { data, error } = await db().rpc('poll_location_roam', { p_host_id: host.id, p_domain: domain });
-      if (!error) roam = await roamTarget(host.id, domain, data);
-    }
+    const profile = network.find((p) => p.domain === domain && p.gps?.enabled);
+    roam = host.active && profile ? await pollRoam(host.id, profile) : null;
+  } else if (domain === null && !wantsCommand && host.active) {
+    // İstemciler etkin konumu normal ağ profili eşitlemesiyle alır.
+    network = await Promise.all(network.map(async (profile) => {
+      if (!profile.gps?.enabled || !roamDomains.has(profile.domain)) return profile;
+      const target = await pollRoam(host.id, profile);
+      if (!target) return profile;
+      return { ...profile, gps: { ...profile.gps, latitude: target.latitude, longitude: target.longitude } };
+    }));
   }
-  return json({ command, roam, host: { id: host.id, sugoId: host.sugo_id, name: host.name, active: host.active, revision: host.updated_at, network: host.network_profiles ?? [] } }, { headers: { 'cache-control': 'no-store' } });
+  return json({ command, roam, host: { id: host.id, sugoId: host.sugo_id, name: host.name, active: host.active, revision: host.updated_at, network } }, { headers: { 'cache-control': 'no-store' } });
 }

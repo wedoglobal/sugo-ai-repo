@@ -4,6 +4,24 @@ const EARTH_KM = 6371;
 const radians = Math.PI / 180;
 export const roamDomains = new Set(['sugo.live', 'www.sugo.live']);
 
+/** Reconstructs the scheduled target at the latest persisted client poll without starting a session. */
+export async function roamStatus(host, profile, connection, now) {
+  const { latitude, longitude } = profile.gps;
+  const center = { latitude, longitude };
+  const seenAt = connection?.seen_at ?? null;
+  const status = { domain: profile.domain, center, seenAt };
+  if (!profile.gps.enabled) return { ...status, state: 'gps_off' };
+  if (!host.active) return { ...status, state: 'paused' };
+  const seen = Date.parse(seenAt);
+  if (!Number.isFinite(seen) || now - seen >= 4 * 60_000) return { ...status, state: 'offline' };
+  const idleSince = Math.max(Date.parse(connection.connected_at), Date.parse(host.last_incoming_at) || 0);
+  const firstAt = idleSince + IDLE_MS;
+  if (now < firstAt) return { ...status, state: 'waiting', firstAt };
+  if (seen < firstAt) return { ...status, state: 'awaiting_poll' };
+  const target = await roamTarget(host.id, profile.domain, { ...center, at: seenAt, idleSince: new Date(idleSince).toISOString() });
+  return target ? { ...status, state: 'moving', target } : { ...status, state: 'no_land' };
+}
+
 /** Natural Earth land cells exclude lakes and leave a margin along water boundaries. */
 export function isRoamLand(latitude, longitude) {
   const { resolution, rows } = land;

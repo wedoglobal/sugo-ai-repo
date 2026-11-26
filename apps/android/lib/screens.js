@@ -4,6 +4,7 @@ var tree = require('./tree');
 var ID = {
   popupClose: 'close',
   tabMessages: 'id_main_bottomtab_conv',
+  tabMessagesBadge: 'id_main_bottomtab_conv_tcv',
   tabHome: 'id_main_bottomtab_home',
   tabMe: 'id_main_bottomtab_me',
   homeNearbyTab: 'id_home_tab_real_nearby',
@@ -30,6 +31,7 @@ var ID = {
   chatSend: 'id_chat_send_btn',
   msgText: 'id_chat_msg_text',
   msgState: 'chatting_state_iv',
+  msgDiamond: 'id_chating_msg_diamond_tv',
   sysTip: 'id_chatting_sys_tips_tv',
   card: 'tv_name',
   profileUid: 'uidView',

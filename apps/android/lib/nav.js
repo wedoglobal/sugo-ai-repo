@@ -173,4 +173,21 @@ function gotoList(ui) {
   return waitForScreen(ui, 'list', 4000);
 }
 
-module.exports = { openSugo: openSugo, profileData: profileData, readSelf: readSelf, gotoKnown: gotoKnown, sameName: sameName, gotoList: gotoList, waitForScreen: waitForScreen, backTo: backTo, openChat: openChat, readPeerId: readPeerId, screenOf: screenOf };
+/** Liste sekmesini (Hepsi/Okunmamış) seçer; sekme düğümü `selected` olana kadar bekler. Sekme yoksa/seçilmezse false. */
+function selectListTab(ui, id) {
+  var snap = ui.snapshot();
+  var tab = tree.visibleById(snap.root, id, snap.size.width);
+  if (!tab) return false;
+  if (tab.selected) return true;
+  ui.click(tab);
+  var end = ui.now() + 3000;
+  while (ui.now() < end) {
+    ui.sleep(120);
+    var s = ui.snapshot();
+    var t = tree.visibleById(s.root, id, s.size.width);
+    if (t && t.selected) return true;
+  }
+  return false;
+}
+
+module.exports = { selectListTab: selectListTab, openSugo: openSugo, profileData: profileData, readSelf: readSelf, gotoKnown: gotoKnown, sameName: sameName, gotoList: gotoList, waitForScreen: waitForScreen, backTo: backTo, openChat: openChat, readPeerId: readPeerId, screenOf: screenOf };

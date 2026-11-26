@@ -10,6 +10,7 @@ var ID = S.ID;
 var HANDLED_RETRY_MS = 60 * 1000;
 var MATCH_RETRY_MS = 30 * 60 * 1000;
 var RETRY_AFTER_ERROR_MS = 15 * 1000;
+var UNREAD_TAB_CHECK_MS = 15 * 1000;
 
 function createLoop(d) {
   var ui = d.ui; var api = d.api; var peers = d.peers; var log = d.log;
@@ -20,6 +21,7 @@ function createLoop(d) {
   var deliveryKey = 'android-delivery:' + (d.hostId || '');
   var deliveries = d.store.get(deliveryKey) || {};
   var deliveryRetryAt = {};
+  var unreadSince = {};   // ad -> okunmamış rozetin ilk görüldüğü an (cevap gecikmesi günlüğü için)
   var scan = { active: false, atBottom: false, lastFullAt: -1e12 };
 
   function snap() { return ui.snapshot(); }
@@ -45,6 +47,16 @@ function createLoop(d) {
     }
     return !!nav.backTo(ui, 'list', 4000);
   }
+
+  /** Okunmamış rozet ilk göründüğünde zamanı tutar; rozet kalkınca siler. */
+  function trackUnread(rows) {
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r.unread > 0) { if (!unreadSince[r.name]) unreadSince[r.name] = d.now(); }
+      else delete unreadSince[r.name];
+    }
+  }
+  function waitedSec(name) { return unreadSince[name] ? Math.round((d.now() - unreadSince[name]) / 1000) : 0; }
 
   function findRow(name, preview) {
     var rows = listRows().rows;
@@ -194,7 +206,7 @@ function createLoop(d) {
     saveDelivery(peer, { id: job.id, sent: true });
     d.lastSentAt = d.now();
     reportDelivery(peer);
-    log('gönderildi ' + peer);
+    log('gönderildi ' + peer + ' okunmamış_bekleme=' + waitedSec(name) + 'sn');
     return true;
   }
 
@@ -230,8 +242,10 @@ function createLoop(d) {
         var body = { peerSugoId: info.id, peerName: name, voiceEnabled: false, messages: messages, match: row.isMatch };
         if (row.online && !row.isMatch) body.online = true;
         if (emptyChat) body.emptyChat = true;
+        var ingestAt = d.now();
         var res = api.ingest(body);
-        log('ingest ' + info.id + ' mesaj=' + messages.length + ' iş=' + (res && res.job ? res.job.kind + '/' + res.job.status : 'yok'));
+        log('ingest ' + info.id + ' mesaj=' + messages.length + ' iş=' + (res && res.job ? res.job.kind + '/' + res.job.status : 'yok')
+          + ' süre=' + Math.round((d.now() - ingestAt) / 1000) + 'sn okunmamış_bekleme=' + waitedSec(name) + 'sn');
         if (res && res.job && res.job.status === 'failed') throw new Error(res.job.error || 'cevap üretimi başarısız');
         if (res && res.job && res.job.status === 'pending') {
           var job = api.nextJob({ replyOnly: res.job.kind !== 'welcome' && messages.length > 0, visiblePeerIds: [info.id] });
@@ -294,6 +308,7 @@ function createLoop(d) {
     var lr = listRows();
     var rows = lr.rows;
     var dup = PE.duplicateNames(rows);
+    trackUnread(rows);
     var visibleIds = [];
     for (var i = 0; i < rows.length; i++) { var id = cachedId(rows[i], dup); if (id && !deliveries[id]) visibleIds.push(id); }
 
@@ -309,15 +324,30 @@ function createLoop(d) {
     }
     var match = matchRow(rows, dup);
     if (match) return handleRow(match, dup);
+    // Okunmamış sekmesi varsa ekran dışındaki okunmamışlar oradan bulunur (sayfa taraması yerine); iş bitince Hepsi'ne dönülür.
+    var unreadTab = tree.visibleById(lr.snap.root, ID.listTabUnread, lr.snap.size.width);
+    if (unreadTab) {
+      if (unreadTab.selected) {
+        nav.selectListTab(ui, ID.listTabAll);
+        scan.lastFullAt = d.now();
+        return true;
+      }
+      var badge = tree.findById(lr.snap.root, ID.tabMessagesBadge);
+      var hasUnread = !badge || String(badge.text || '').trim() !== '';
+      if (hasUnread && d.now() - scan.lastFullAt > UNREAD_TAB_CHECK_MS) {
+        scan.lastFullAt = d.now();
+        if (nav.selectListTab(ui, ID.listTabUnread)) { log('okunmamış sekmesi taranıyor'); return true; }
+      }
+    }
     // Aşağıdaki okunmamışlar için listeyi sayfa sayfa tara; sona gelince başa dön, tam taramalar arası 60 sn.
-    if (!scan.atBottom && (scan.active || d.now() - scan.lastFullAt > 60000)) {
+    if (!unreadTab && !scan.atBottom && (scan.active || d.now() - scan.lastFullAt > 60000)) {
       scan.active = true;
       var before = pageSig(rows);
       swipeList(true);
       if (pageSig(listRows().rows) === before) scan.atBottom = true;
       return true;
     }
-    if (scan.active) {
+    if (!unreadTab && scan.active) {
       scrollToTop();
       scan.active = false; scan.atBottom = false; scan.lastFullAt = d.now();
     }

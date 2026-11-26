@@ -43,22 +43,60 @@ describe('eski istemci API sözleşmeleri', () => {
 });
 
 describe('konum gezintisi kontrolü', () => {
-  it('eski istemciye aynı şekli döndürür ve yalnız konum isteyen Sugo istemcisi için zamanlayıcıyı sorgular', async () => {
+  const center = { latitude: 41.0082, longitude: 28.9784 };
+  const profile = { domain: 'sugo.live', gps: { enabled: true, accuracy: 20, ...center }, proxy: { enabled: false } };
+  const other = { ...profile, domain: 'other.test' };
+  const disabled = { ...profile, domain: 'www.sugo.live', gps: { ...profile.gps, enabled: false } };
+  const get = async (extra = '') => (await control({ url: new URL(`https://example.test/api/ext/control?host=123${extra}`) })).json();
+  function setup({ data = null, error = null, active = true } = {}) {
     const host = {
-      id: 'db-host', sugo_id: '123', name: 'host', active: true, updated_at: 'revision',
-      network_profiles: [{ domain: 'sugo.live', gps: { enabled: true } }],
+      id: 'db-host', sugo_id: '123', name: 'host', active, updated_at: 'revision',
+      network_profiles: [profile, other, disabled],
     };
     const table = {
       select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), update: vi.fn().mockReturnThis(),
       or: vi.fn(), maybeSingle: vi.fn().mockResolvedValue({ data: host }),
     };
-    mocks.db.from = vi.fn().mockReturnValue(table);
-    mocks.db.rpc = vi.fn().mockResolvedValue({ data: null });
-    const get = async (extra) => (await control({ url: new URL(`https://example.test/api/ext/control?host=123${extra}`) })).json();
-    expect(await get('')).toEqual({ command: null, host: { id: host.id, sugoId: '123', name: host.name, active: true, revision: host.updated_at, network: host.network_profiles } });
+    const command = { ...table, maybeSingle: vi.fn().mockResolvedValue({ data: { value: { wakeAt: 1234 } } }) };
+    mocks.db.from = vi.fn((name) => name === 'hosts' ? table : command);
+    mocks.db.rpc = vi.fn().mockReturnValue({ abortSignal: vi.fn().mockResolvedValue({ data, error }) });
+    return host;
+  }
+  const at = '2026-11-26T09:10:00Z';
+  const ready = { ...center, at, idleSince: '2026-11-26T09:00:00Z' };
+
+  it('aynı kontrol yanıtından otomatik konumu iletir ve ayrı gezinti yanıtını korur', async () => {
+    const host = setup({ data: ready });
+    const explicit = await get('&roam=sugo.live');
+    expect(explicit.host.network).toEqual(host.network_profiles);
+    expect(explicit.roam).toMatchObject({ center, stepAt: Date.parse(at) });
+    mocks.db.rpc.mockClear();
+    const { latitude, longitude } = explicit.roam;
+    expect({ latitude, longitude }).not.toEqual(center);
+    expect(await get()).toEqual({ command: null, host: { id: host.id, sugoId: '123', name: host.name, active: true, revision: host.updated_at, network: [
+      { ...profile, gps: { ...profile.gps, latitude, longitude } }, other, disabled,
+    ] } });
+    expect(mocks.db.rpc).toHaveBeenCalledExactlyOnceWith('poll_location_roam', { p_host_id: host.id, p_domain: 'sugo.live' });
+    expect(host.network_profiles[0].gps).toMatchObject(center);
+  });
+
+  it.each([
+    { data: { ...ready, idleSince: at } },
+    { data: { ...ready, latitude: 42 } },
+    { error: { code: 'PGRST202' } },
+  ])('hedef hazır değilse veya gezinti sorgusu başarısızsa kayıtlı konumu verir', async (options) => {
+    const host = setup(options);
+    expect((await get()).host.network).toEqual(host.network_profiles);
+    expect(await get('&roam=sugo.live')).toHaveProperty('roam', null);
+  });
+
+  it('dinlenme komutu, pasif profil ve desteklenmeyen alan adı gezinti sayacını başlatmaz', async () => {
+    const host = setup({ data: ready });
+    expect(await get('&cmd=1')).toMatchObject({ command: { wakeAt: 1234 }, host: { network: host.network_profiles } });
     expect(await get('&roam=other.test')).not.toHaveProperty('roam');
     expect(mocks.db.rpc).not.toHaveBeenCalled();
-    expect(await get('&roam=sugo.live')).toHaveProperty('roam', null);
-    expect(mocks.db.rpc).toHaveBeenCalledExactlyOnceWith('poll_location_roam', { p_host_id: host.id, p_domain: 'sugo.live' });
+    setup({ data: ready, active: false });
+    expect((await get()).host.network).toEqual(host.network_profiles);
+    expect(mocks.db.rpc).not.toHaveBeenCalled();
   });
 });

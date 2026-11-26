@@ -72,3 +72,24 @@ describe('cinsiyet rozeti', () => {
     expect(parse.gender(load('chat-settings'), size)).toBeNull();
   });
 });
+
+describe('elmas rozeti ve teslim edilmiş giden balonlar', () => {
+  const root = load('chat-diamonds');
+  const rows = parse.chatMessageRows(root, size);
+  it('yön ve metinleri sırayla okur', () => {
+    expect(rows.map((r) => [r.dir, r.text])).toEqual([['in', 'yarın görüşürüz'], ['out', 'eve geldim'], ['out', 'geliyorum'], ['out', 'm'], ['in', 'bekliyorum, ne zaman gelirsin']]);
+  });
+  it('giden balonun xN rozetini okur; rozetsiz ve gelen balonda 0', () => {
+    expect(rows.map((r) => r.diamonds)).toEqual([0, 60, 0, 0, 0]);
+  });
+  it('yeşil durum simgesi teslim edilmiş giden balonu geçmişten düşürmez, elmasıyla ingest edilir', () => {
+    expect(rows.map((r) => r.status)).toEqual(['visible', 'visible', 'visible', 'visible', 'visible']);
+    expect(parse.chatMessages(root, size)).toEqual([
+      { dir: 'in', text: 'yarın görüşürüz', ts: '', diamonds: 0 },
+      { dir: 'out', text: 'eve geldim', ts: '', diamonds: 60 },
+      { dir: 'out', text: 'geliyorum', ts: '', diamonds: 0 },
+      { dir: 'out', text: 'm', ts: '', diamonds: 0 },
+      { dir: 'in', text: 'bekliyorum, ne zaman gelirsin', ts: '', diamonds: 0 }
+    ]);
+  });
+});

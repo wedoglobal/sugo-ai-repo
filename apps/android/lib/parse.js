@@ -40,27 +40,48 @@ function rowSignature(row) {
   return [row.name, row.preview, row.time, row.unread].join('|');
 }
 
-/** Sohbet: gelen/giden metinler sırayla. Yön, mesaj satırındaki avatarın ekranın hangi yarısında olduğundan bulunur (giden = sağ). */
+/** Giden balonun altındaki elmas rozeti ("x60"); rozet yoksa 0. */
+function diamondsOf(row) {
+  var n = tree.findById(row, ID.msgDiamond);
+  var m = n ? /x\s*(\d+)/i.exec(String(n.text || '')) : null;
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+/**
+ * Sohbet: gelen/giden metinler sırayla. Yön, mesaj satırındaki avatarın ekranın hangi yarısında olduğundan bulunur (giden = sağ).
+ * Giden balonun yanındaki durum simgesi (`chatting_state_iv`) teslim edilmiş mesajda da (yeşil ✓) kalır; hata ünlemiyle ağaçta
+ * ayrılamaz. Elmas rozeti olan ya da altında karşı tarafın mesajı bulunan balon teslim edilmiş sayılır, simge yalnız
+ * konuşmanın son giden balonunda (sonrasında cevap yok) başarısız/belirsiz anlamına gelir.
+ */
 function chatMessageRows(root, size) {
-  var texts = tree.findAll(root, function (n) { return n.id === ID.msgText && tree.isVisible(n, size.width); });
+  var isMsgText = function (n) { return n.id === ID.msgText; };
+  var texts = tree.findAll(root, function (n) { return isMsgText(n) && tree.isVisible(n, size.width); });
   var messages = [];
   for (var i = 0; i < texts.length; i++) {
+    // Satır = yalnız bu metni içeren en geniş ata; avatarsız (gruplanmış/kısmen görünen) balon komşu satırların avatarını almaz.
     var row = texts[i];
-    var avatar = null;
-    while (row.parent && !(avatar = tree.findById(row, ID.itemAvatar))) row = row.parent;
+    while (row.parent && tree.findAll(row.parent, isMsgText).length === 1) row = row.parent;
+    var avatar = tree.findById(row, ID.itemAvatar);
     var dir = avatar ? (tree.centerX(avatar) > size.width / 2 ? 'out' : 'in') : (tree.centerX(texts[i]) > size.width / 2 ? 'out' : 'in');
     var text = String(texts[i].text || '').trim();
     var state = dir === 'out' && avatar ? tree.visibleById(row, ID.msgState, size.width) : null;
     var failed = state && (state.clickable || /başarısız|gönderilemedi|yeniden gönder|failed|resend|^!$/i.test(String(state.desc || state.text || '')));
-    if (text) messages.push({ dir: dir, text: text, status: failed ? 'failed' : state ? 'pending' : 'visible', top: texts[i].t });
+    var diamonds = dir === 'out' ? diamondsOf(row) : 0;
+    if (text) messages.push({ dir: dir, text: text, status: failed ? 'failed' : state ? 'pending' : 'visible', diamonds: diamonds, top: texts[i].t });
   }
   messages.sort(function (a, b) { return a.top - b.top; });
+  var inLater = false;
+  for (var j = messages.length - 1; j >= 0; j--) {
+    var m = messages[j];
+    if (m.dir === 'in') inLater = true;
+    else if (m.status !== 'visible' && (m.diamonds > 0 || inLater)) m.status = 'visible';
+  }
   return messages;
 }
 
 function chatMessages(root, size) {
   return chatMessageRows(root, size).filter(function (m) { return m.status === 'visible'; })
-    .map(function (m) { return { dir: m.dir, text: m.text, ts: '', diamonds: 0 }; });
+    .map(function (m) { return { dir: m.dir, text: m.text, ts: '', diamonds: m.diamonds || 0 }; });
 }
 
 /** Sistem ipuçları ("harika bir eşleşme" vb.) ayrı okunur; mesaj sayılmaz. */

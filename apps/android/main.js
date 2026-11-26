@@ -1,6 +1,6 @@
 // AutoJS6 girişi. Yapılandırma: bu dosyanın yanındaki config.json (veya /sdcard/sugo-dev/config.json):
 // { "baseUrl": "https://...", "apiKey": "...", "hostSugoId": "123", "dryRun": false, "allowPeers": ["peer sugo id"] (isteğe bağlı: yalnız bu kişilerle çalış) }
-var VERSION = 'android-0.1.3';
+var VERSION = 'android-0.1.4';
 var api = require('./lib/api');
 var loopLib = require('./lib/loop');
 var outreachLib = require('./lib/outreach');
